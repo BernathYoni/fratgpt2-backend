@@ -60,14 +60,14 @@ export class GeminiProvider implements LLMProvider {
       return {
         shortAnswer: parsed.shortAnswer || 'No answer provided',
         explanation: parsed.explanation || text,
-        tokensUsed: response.usageMetadata?.totalTokenCount,
+        tokensUsed: (response as any).usageMetadata?.totalTokenCount,
       };
     } catch (error) {
       // Fallback if not JSON
       return {
         shortAnswer: 'See explanation',
         explanation: text,
-        tokensUsed: response.usageMetadata?.totalTokenCount,
+        tokensUsed: (response as any).usageMetadata?.totalTokenCount,
       };
     }
   }

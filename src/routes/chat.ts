@@ -205,8 +205,8 @@ export async function chatRoutes(server: FastifyInstance) {
         .filter(m => m.provider !== 'GEMINI' && m.provider !== 'OPENAI' && m.provider !== 'CLAUDE')
         .map(m => ({
           role: m.role === 'USER' ? 'user' : 'assistant',
-          content: m.role === 'ASSISTANT' ? m.explanation || m.content : m.content,
-          imageData: m.attachments[0]?.imageData,
+          content: m.content,
+          imageData: m.attachments[0]?.imageData || undefined,
         }));
 
       // Add new message

@@ -28,7 +28,7 @@ export class ClaudeProvider implements LLMProvider {
     const claudeMessages: Anthropic.MessageParam[] = [];
 
     for (const msg of messages) {
-      const content: Anthropic.ContentBlock[] = [];
+      const content: any[] = [];
 
       if (msg.imageData) {
         content.push({
@@ -61,8 +61,8 @@ export class ClaudeProvider implements LLMProvider {
     });
 
     const text = response.content
-      .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-      .map(block => block.text)
+      .filter((block: any) => block.type === 'text')
+      .map((block: any) => block.text)
       .join('\n');
 
     // Parse JSON response
