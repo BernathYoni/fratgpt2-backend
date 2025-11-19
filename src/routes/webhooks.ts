@@ -80,7 +80,8 @@ export async function webhookRoutes(server: FastifyInstance) {
       server.log.info('[WEBHOOK-STRIPE] ✅ Webhook processed successfully');
       return reply.send({ received: true });
     } catch (error) {
-      server.log.error('[WEBHOOK-STRIPE] ❌ Webhook handler error:', error);
+      server.log.error('[WEBHOOK-STRIPE] ❌ Webhook handler error:');
+      server.log.error(error);
       return reply.code(500).send({ error: 'Webhook handler failed' });
     }
   });

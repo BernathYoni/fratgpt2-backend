@@ -11,12 +11,13 @@ export async function usageRoutes(server: FastifyInstance) {
       server.log.info(`[USAGE-STATS] User ID: ${userId}`);
 
       const stats = await UsageService.getStats(userId);
-      server.log.info(`[USAGE-STATS] ✓ Stats retrieved - Today: ${stats.today}, Total: ${stats.total}`);
+      server.log.info(`[USAGE-STATS] ✓ Stats retrieved - Today used: ${stats.today.used}, Plan: ${stats.plan}`);
       server.log.info('[USAGE-STATS] ✅ Stats sent successfully');
 
       return reply.send(stats);
     } catch (error) {
-      server.log.error('[USAGE-STATS] ❌ Error fetching stats:', error);
+      server.log.error('[USAGE-STATS] ❌ Error fetching stats:');
+      server.log.error(error);
       return reply.code(401).send({ error: 'Unauthorized' });
     }
   });
@@ -34,7 +35,8 @@ export async function usageRoutes(server: FastifyInstance) {
 
       return reply.send(check);
     } catch (error) {
-      server.log.error('[USAGE-CHECK] ❌ Error checking limit:', error);
+      server.log.error('[USAGE-CHECK] ❌ Error checking limit:');
+      server.log.error(error);
       return reply.code(401).send({ error: 'Unauthorized' });
     }
   });

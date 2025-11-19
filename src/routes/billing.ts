@@ -84,7 +84,8 @@ export async function billingRoutes(server: FastifyInstance) {
 
       return reply.send({ url: session.url });
     } catch (error) {
-      server.log.error('[BILLING-CHECKOUT] ❌ Error creating checkout session:', error);
+      server.log.error('[BILLING-CHECKOUT] ❌ Error creating checkout session:');
+      server.log.error(error);
       return reply.code(500).send({ error: 'Failed to create checkout session' });
     }
   });
@@ -119,7 +120,8 @@ export async function billingRoutes(server: FastifyInstance) {
 
       return reply.send({ url: session.url });
     } catch (error) {
-      server.log.error('[BILLING-PORTAL] ❌ Error creating portal session:', error);
+      server.log.error('[BILLING-PORTAL] ❌ Error creating portal session:');
+      server.log.error(error);
       return reply.code(500).send({ error: 'Failed to create portal session' });
     }
   });
