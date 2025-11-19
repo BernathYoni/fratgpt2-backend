@@ -146,12 +146,14 @@ export async function authRoutes(server: FastifyInstance) {
       server.log.info(`[AUTH-ME] ✓ User: ${user.email}, Plan: ${subscription.plan}`);
 
       return reply.send({
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        plan: subscription.plan,
-        subscriptionStatus: subscription.status,
-        currentPeriodEnd: subscription.currentPeriodEnd,
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          plan: subscription.plan,
+          subscriptionStatus: subscription.status,
+          currentPeriodEnd: subscription.currentPeriodEnd,
+        }
       });
     } catch (error) {
       server.log.error(error);
