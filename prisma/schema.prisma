@@ -1,0 +1,152 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String         @id @default(uuid())
+  email            String         @unique
+  passwordHash     String
+  role             UserRole       @default(USER)
+  stripeCustomerId String?        @unique
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  subscriptions    Subscription[]
+  chatSessions     ChatSession[]
+  usage            Usage[]
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model Subscription {
+  id                   String             @id @default(uuid())
+  userId               String
+  stripeSubscriptionId String?            @unique
+  stripePriceId        String?
+  status               SubscriptionStatus @default(ACTIVE)
+  plan                 Plan               @default(FREE)
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  CANCELED
+  PAST_DUE
+}
+
+enum Plan {
+  FREE
+  BASIC
+  PRO
+}
+
+model ChatSession {
+  id        String      @id @default(uuid())
+  userId    String
+  title     String?
+  mode      ChatMode
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  Message[]
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+enum ChatMode {
+  REGULAR
+  FAST
+  EXPERT
+}
+
+model Message {
+  id            String       @id @default(uuid())
+  chatSessionId String
+  role          MessageRole
+  content       String       @db.Text
+  shortAnswer   String?
+  provider      LLMProvider?
+  metadata      Json?
+  createdAt     DateTime     @default(now())
+
+  chatSession   ChatSession  @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+  attachments   Attachment[]
+
+  @@index([chatSessionId])
+  @@index([createdAt])
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum LLMProvider {
+  GEMINI
+  OPENAI
+  CLAUDE
+  CONSENSUS
+}
+
+model Attachment {
+  id         String         @id @default(uuid())
+  messageId  String
+  type       AttachmentType
+  source     CaptureSource
+  storageUrl String?
+  imageData  String?        @db.Text
+  width      Int?
+  height     Int?
+  createdAt  DateTime       @default(now())
+
+  message    Message        @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@index([createdAt])
+}
+
+enum AttachmentType {
+  IMAGE
+}
+
+enum CaptureSource {
+  SCREEN
+  SNIP
+}
+
+model Usage {
+  id                 String   @id @default(uuid())
+  userId             String
+  date               DateTime @db.Date
+  solvesUsed         Int      @default(0)
+  modeRegularCount   Int      @default(0)
+  modeFastCount      Int      @default(0)
+  modeExpertCount    Int      @default(0)
+  tokensUsed         Int      @default(0)
+
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+}

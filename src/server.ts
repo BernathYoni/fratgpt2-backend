@@ -1,0 +1,56 @@
+import Fastify from 'fastify';
+import cors from '@fastify/cors';
+import jwt from '@fastify/jwt';
+import multipart from '@fastify/multipart';
+import { authRoutes } from './routes/auth';
+import { chatRoutes } from './routes/chat';
+import { billingRoutes } from './routes/billing';
+import { webhookRoutes } from './routes/webhooks';
+import { usageRoutes } from './routes/usage';
+
+const server = Fastify({
+  logger: true,
+  bodyLimit: 10485760, // 10MB for images
+});
+
+async function start() {
+  try {
+    // Register plugins
+    await server.register(cors, {
+      origin: [
+        process.env.FRONTEND_URL || 'http://localhost:3001',
+        /^chrome-extension:\/\//,
+      ],
+      credentials: true,
+    });
+
+    await server.register(jwt, {
+      secret: process.env.JWT_SECRET || 'super-secret-change-in-production',
+    });
+
+    await server.register(multipart);
+
+    // Health check
+    server.get('/health', async () => {
+      return { status: 'ok', timestamp: new Date().toISOString() };
+    });
+
+    // Register routes
+    await server.register(authRoutes, { prefix: '/auth' });
+    await server.register(chatRoutes, { prefix: '/chat' });
+    await server.register(billingRoutes, { prefix: '/billing' });
+    await server.register(usageRoutes, { prefix: '/usage' });
+    await server.register(webhookRoutes, { prefix: '/webhooks' });
+
+    const port = parseInt(process.env.PORT || '3000', 10);
+    const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
+
+    await server.listen({ port, host });
+    console.log(`🚀 Server running on ${host}:${port}`);
+  } catch (err) {
+    server.log.error(err);
+    process.exit(1);
+  }
+}
+
+start();
