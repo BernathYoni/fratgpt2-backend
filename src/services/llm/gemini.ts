@@ -21,8 +21,8 @@ export class GeminiProvider implements LLMProvider {
 
   async generate(messages: LLMMessage[], options?: LLMOptions): Promise<LLMResponse> {
     const model = options?.maxTokens && options.maxTokens < 2000
-      ? this.client.getGenerativeModel({ model: 'gemini-1.5-flash-latest' })
-      : this.client.getGenerativeModel({ model: 'gemini-1.5-pro-latest' });
+      ? this.client.getGenerativeModel({ model: 'gemini-2.5-flash' })
+      : this.client.getGenerativeModel({ model: 'gemini-2.5-pro' });
 
     // Build the prompt
     const parts: any[] = [];
