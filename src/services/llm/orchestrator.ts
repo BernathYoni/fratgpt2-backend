@@ -43,15 +43,36 @@ export class LLMOrchestrator {
     providers?: ProviderResult[];
     consensus?: LLMResponse;
   }> {
-    switch (mode) {
-      case 'FAST':
-        return this.generateFast(messages);
-      case 'REGULAR':
-        return this.generateRegular(messages);
-      case 'EXPERT':
-        return this.generateExpert(messages);
-      default:
-        throw new Error(`Unknown mode: ${mode}`);
+    console.log('[ORCHESTRATOR] 🤖 generate() called');
+    console.log('[ORCHESTRATOR] Mode:', mode);
+    console.log('[ORCHESTRATOR] Messages count:', messages.length);
+    console.log('[ORCHESTRATOR] Has image:', messages.some(m => !!m.imageData));
+
+    try {
+      let result;
+      switch (mode) {
+        case 'FAST':
+          console.log('[ORCHESTRATOR] → Routing to generateFast()');
+          result = await this.generateFast(messages);
+          break;
+        case 'REGULAR':
+          console.log('[ORCHESTRATOR] → Routing to generateRegular()');
+          result = await this.generateRegular(messages);
+          break;
+        case 'EXPERT':
+          console.log('[ORCHESTRATOR] → Routing to generateExpert()');
+          result = await this.generateExpert(messages);
+          break;
+        default:
+          throw new Error(`Unknown mode: ${mode}`);
+      }
+      console.log('[ORCHESTRATOR] ✅ Generation complete');
+      return result;
+    } catch (error: any) {
+      console.error('[ORCHESTRATOR] ❌ ERROR in generate()');
+      console.error('[ORCHESTRATOR] Error:', error?.message);
+      console.error('[ORCHESTRATOR] Stack:', error?.stack);
+      throw error;
     }
   }
 
@@ -59,24 +80,36 @@ export class LLMOrchestrator {
    * Fast mode: Use cheaper/faster model
    */
   private async generateFast(messages: LLMMessage[]) {
-    const response = await this.gemini.generate(messages, {
-      maxTokens: 1024,
-      temperature: 0.5,
-    });
-
-    return { primary: response };
+    console.log('[FAST] Calling Gemini with maxTokens=1024, temp=0.5');
+    try {
+      const response = await this.gemini.generate(messages, {
+        maxTokens: 1024,
+        temperature: 0.5,
+      });
+      console.log('[FAST] ✅ Gemini responded successfully');
+      return { primary: response };
+    } catch (error: any) {
+      console.error('[FAST] ❌ Gemini error:', error?.message);
+      throw error;
+    }
   }
 
   /**
    * Regular mode: Use high-quality model
    */
   private async generateRegular(messages: LLMMessage[]) {
-    const response = await this.gemini.generate(messages, {
-      maxTokens: 2048,
-      temperature: 0.7,
-    });
-
-    return { primary: response };
+    console.log('[REGULAR] Calling Gemini with maxTokens=2048, temp=0.7');
+    try {
+      const response = await this.gemini.generate(messages, {
+        maxTokens: 2048,
+        temperature: 0.7,
+      });
+      console.log('[REGULAR] ✅ Gemini responded successfully');
+      return { primary: response };
+    } catch (error: any) {
+      console.error('[REGULAR] ❌ Gemini error:', error?.message);
+      throw error;
+    }
   }
 
   /**
