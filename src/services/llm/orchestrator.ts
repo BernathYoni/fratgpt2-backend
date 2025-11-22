@@ -4,7 +4,7 @@ import { OpenAIProvider } from './openai';
 import { ClaudeProvider } from './claude';
 import { LLMMessage, LLMResponse } from './types';
 
-const CONSENSUS_PROMPT = `You are a consensus analyzer for FratGPT. You will receive 3 different AI responses to the same homework question from Gemini, ChatGPT, and Claude.
+const CONSENSUS_PROMPT = `You are a professional consensus analyzer for a homework assistance service. You will receive 3 different AI responses to the same homework question from Gemini, ChatGPT, and Claude.
 
 Your job is to:
 1. Determine the BEST short answer (pick the most accurate one, or synthesize if needed)
