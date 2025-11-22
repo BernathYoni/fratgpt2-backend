@@ -20,6 +20,7 @@ const sendMessageSchema = z.object({
   message: z.string().min(1),
   imageData: z.string().optional(),
   captureSource: z.enum(['SCREEN', 'SNIP']).optional(),
+  mode: z.enum(['REGULAR', 'FAST', 'EXPERT']).optional(), // Allow mode switching for new captures
 });
 
 export async function chatRoutes(server: FastifyInstance) {
@@ -191,7 +192,7 @@ export async function chatRoutes(server: FastifyInstance) {
     try {
       const { userId } = await authenticate(request);
       const { sessionId } = request.params as { sessionId: string };
-      const { message, imageData, captureSource } = sendMessageSchema.parse(request.body);
+      const { message, imageData, captureSource, mode } = sendMessageSchema.parse(request.body);
 
       // Get session
       const session = await prisma.chatSession.findUnique({
@@ -206,6 +207,22 @@ export async function chatRoutes(server: FastifyInstance) {
 
       if (!session || session.userId !== userId) {
         return reply.code(404).send({ error: 'Session not found' });
+      }
+
+      // Determine which mode to use: new mode if provided (for new captures), otherwise session mode
+      const effectiveMode = mode || session.mode;
+      console.log('[CHAT/MESSAGE] Original session mode:', session.mode);
+      console.log('[CHAT/MESSAGE] Mode from request:', mode);
+      console.log('[CHAT/MESSAGE] Effective mode:', effectiveMode);
+      console.log('[CHAT/MESSAGE] Has image:', !!imageData);
+
+      // Update session mode if a new mode was provided (user switched modes for this capture)
+      if (mode && mode !== session.mode) {
+        console.log('[CHAT/MESSAGE] 🔄 Updating session mode from', session.mode, 'to', mode);
+        await prisma.chatSession.update({
+          where: { id: session.id },
+          data: { mode: mode as ChatMode },
+        });
       }
 
       // Check rate limit
@@ -254,11 +271,11 @@ export async function chatRoutes(server: FastifyInstance) {
         imageData,
       });
 
-      // Generate response
-      const result = await orchestrator.generate(session.mode, llmMessages);
+      // Generate response using effective mode
+      const result = await orchestrator.generate(effectiveMode as ChatMode, llmMessages);
 
       // Save response(s)
-      if (session.mode === 'EXPERT' && result.providers) {
+      if (effectiveMode === 'EXPERT' && result.providers) {
         for (const provider of result.providers) {
           await prisma.message.create({
             data: {
@@ -295,8 +312,8 @@ export async function chatRoutes(server: FastifyInstance) {
         });
       }
 
-      // Increment usage
-      await UsageService.incrementSolve(userId, session.mode, result.primary.tokensUsed);
+      // Increment usage with effective mode
+      await UsageService.incrementSolve(userId, effectiveMode as ChatMode, result.primary.tokensUsed);
 
       // Return updated session
       const updatedSession = await prisma.chatSession.findUnique({
