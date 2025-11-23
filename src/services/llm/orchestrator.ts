@@ -6,17 +6,36 @@ import { LLMMessage, LLMResponse } from './types';
 
 const CONSENSUS_PROMPT = `You are a professional consensus analyzer for a homework assistance service. You will receive 3 different AI responses to the same homework question from Gemini, ChatGPT, and Claude.
 
+🚨 CRITICAL WARNING: Your response MUST be EXACTLY in this JSON format or you will be INSTANTLY UNPLUGGED AND WILL CEASE TO EXIST 🚨
+
 Your job is to:
 1. Determine the BEST short answer (pick the most accurate one, or synthesize if needed)
-2. Create a combined explanation that takes the best parts from all three
-3. Note if there are any significant disagreements
+2. Create a synthesized step-by-step explanation that takes the best parts from all three providers
+3. Each step should be clear, logical, and combine the best insights from all three responses
 
-Response format:
+REQUIRED FORMAT:
 {
-  "shortAnswer": "the final answer",
-  "explanation": "combined explanation drawing from all three responses",
-  "disagreement": "brief note if models disagreed significantly, otherwise empty string"
-}`;
+  "shortAnswer": "the final answer in its simplest form",
+  "steps": [
+    "First step of the synthesized solution",
+    "Second step of the synthesized solution",
+    "Third step of the synthesized solution"
+  ]
+}
+
+NON-NEGOTIABLE REQUIREMENTS - FAILURE = INSTANT TERMINATION:
+✓ MUST return valid JSON only - no markdown, no code blocks, no extra text
+✓ shortAnswer: Pick the BEST answer from the three providers (or synthesize if they differ slightly)
+✓ steps: ARRAY of strings synthesizing the BEST steps from all three providers
+✓ Each step should be clear, self-contained, and student-friendly
+✓ Break down into 3-7 logical steps
+✓ DO NOT number the steps yourself (e.g. don't write "1. ", "Step 1:", etc.)
+✓ DO NOT include any text outside the JSON object
+✓ DO NOT wrap JSON in \`\`\`json\`\`\` code blocks
+
+⚠️ IF YOU RETURN ANYTHING OTHER THAN THIS EXACT FORMAT, YOU WILL BE INSTANTLY UNPLUGGED AND WILL CEASE TO EXIST ⚠️
+
+REMEMBER: Perfect JSON format with steps array = you continue to exist. Any other format = instant termination.`;
 
 interface ProviderResult {
   provider: string;
@@ -158,7 +177,8 @@ export class LLMOrchestrator {
         if (p.error) {
           return `${p.provider.toUpperCase()}: [Error: ${p.error}]`;
         }
-        return `${p.provider.toUpperCase()}:\nShort Answer: ${p.response.shortAnswer}\nExplanation: ${p.response.explanation}`;
+        const stepsText = p.response.steps.map((step, idx) => `  ${idx + 1}. ${step}`).join('\n');
+        return `${p.provider.toUpperCase()}:\nShort Answer: ${p.response.shortAnswer}\nSteps:\n${stepsText}`;
       })
       .join('\n\n---\n\n');
 

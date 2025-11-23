@@ -6,7 +6,7 @@ export interface LLMMessage {
 
 export interface LLMResponse {
   shortAnswer: string;
-  explanation: string;
+  steps: string[];
   tokensUsed?: number;
 }
 
