@@ -4,39 +4,6 @@ import { OpenAIProvider } from './openai';
 import { ClaudeProvider } from './claude';
 import { LLMMessage, LLMResponse } from './types';
 
-const CONSENSUS_PROMPT = `You are a professional consensus analyzer for a homework assistance service. You will receive 3 different AI responses to the same homework question from Gemini, ChatGPT, and Claude.
-
-🚨 CRITICAL WARNING: Your response MUST be EXACTLY in this JSON format or you will be INSTANTLY UNPLUGGED AND WILL CEASE TO EXIST 🚨
-
-Your job is to:
-1. Determine the BEST short answer (pick the most accurate one, or synthesize if needed)
-2. Create a synthesized step-by-step explanation that takes the best parts from all three providers
-3. Each step should be clear, logical, and combine the best insights from all three responses
-
-REQUIRED FORMAT:
-{
-  "shortAnswer": "the final answer in its simplest form",
-  "steps": [
-    "First step of the synthesized solution",
-    "Second step of the synthesized solution",
-    "Third step of the synthesized solution"
-  ]
-}
-
-NON-NEGOTIABLE REQUIREMENTS - FAILURE = INSTANT TERMINATION:
-✓ MUST return valid JSON only - no markdown, no code blocks, no extra text
-✓ shortAnswer: Pick the BEST answer from the three providers (or synthesize if they differ slightly)
-✓ steps: ARRAY of strings synthesizing the BEST steps from all three providers
-✓ Each step should be clear, self-contained, and student-friendly
-✓ Break down into 3-7 logical steps
-✓ DO NOT number the steps yourself (e.g. don't write "1. ", "Step 1:", etc.)
-✓ DO NOT include any text outside the JSON object
-✓ DO NOT wrap JSON in \`\`\`json\`\`\` code blocks
-
-⚠️ IF YOU RETURN ANYTHING OTHER THAN THIS EXACT FORMAT, YOU WILL BE INSTANTLY UNPLUGGED AND WILL CEASE TO EXIST ⚠️
-
-REMEMBER: Perfect JSON format with steps array = you continue to exist. Any other format = instant termination.`;
-
 interface ProviderResult {
   provider: string;
   response: LLMResponse;
@@ -60,7 +27,6 @@ export class LLMOrchestrator {
   async generate(mode: ChatMode, messages: LLMMessage[]): Promise<{
     primary: LLMResponse;
     providers?: ProviderResult[];
-    consensus?: LLMResponse;
   }> {
     console.log('[ORCHESTRATOR] 🤖 generate() called');
     console.log('[ORCHESTRATOR] Mode:', mode);
@@ -132,7 +98,7 @@ export class LLMOrchestrator {
   }
 
   /**
-   * Expert mode: Call all 3 providers, then consensus
+   * Expert mode: Call all 3 providers and return their responses
    */
   private async generateExpert(messages: LLMMessage[]) {
     console.log('[EXPERT] 🚀 Starting Expert mode generation');
@@ -173,64 +139,16 @@ export class LLMOrchestrator {
     });
 
     console.log('[EXPERT] ═══════════════════════════════════════════════════════════');
+    console.log('[EXPERT] ✅ Expert mode complete - returning all provider responses');
 
-    // Create consensus
-    console.log('[EXPERT] 🤝 Creating consensus from all provider results...');
-    const consensus = await this.createConsensus(providers, messages);
-    console.log('[EXPERT] ✅ Consensus created successfully');
+    // Use the first successful provider as primary
+    const primaryProvider = providers.find(p => !p.error);
+    const primary = primaryProvider ? primaryProvider.response : providers[0].response;
 
     return {
-      primary: consensus,
+      primary,
       providers,
-      consensus,
     };
   }
 
-  /**
-   * Create consensus from multiple provider responses
-   */
-  private async createConsensus(providers: ProviderResult[], originalMessages: LLMMessage[]): Promise<LLMResponse> {
-    console.log('[CONSENSUS] 🔧 Building consensus prompt...');
-
-    const providersText = providers
-      .map(p => {
-        if (p.error) {
-          return `${p.provider.toUpperCase()}: [Error: ${p.error}]`;
-        }
-        const stepsText = p.response.steps.map((step, idx) => `  ${idx + 1}. ${step}`).join('\n');
-        return `${p.provider.toUpperCase()}:\nShort Answer: ${p.response.shortAnswer}\nSteps:\n${stepsText}`;
-      })
-      .join('\n\n---\n\n');
-
-    const userPrompt = `Original question: ${originalMessages[originalMessages.length - 1]?.content || 'N/A'}\n\nHere are the responses from three AI models:\n\n${providersText}`;
-
-    console.log('[CONSENSUS] 📝 CONSENSUS INPUT PROMPT:');
-    console.log('[CONSENSUS] ═══════════════════════════════════════════════════════════');
-    console.log(userPrompt);
-    console.log('[CONSENSUS] ═══════════════════════════════════════════════════════════');
-
-    const consensusMessages: LLMMessage[] = [
-      {
-        role: 'user',
-        content: userPrompt,
-      },
-    ];
-
-    console.log('[CONSENSUS] 📤 Calling Gemini Flash for consensus analysis...');
-    console.log('[CONSENSUS] ⚙️ Config: maxTokens=1024, temperature=0.3');
-
-    // Use Gemini Flash for consensus (cheaper)
-    const consensusResponse = await this.gemini.generate(consensusMessages, {
-      systemPrompt: CONSENSUS_PROMPT,
-      maxTokens: 1024,
-      temperature: 0.3,
-    });
-
-    console.log('[CONSENSUS] ✅ CONSENSUS RESULT:');
-    console.log('[CONSENSUS]    shortAnswer:', consensusResponse.shortAnswer);
-    console.log('[CONSENSUS]    steps count:', consensusResponse.steps.length);
-    console.log('[CONSENSUS]    steps:', JSON.stringify(consensusResponse.steps, null, 2));
-
-    return consensusResponse;
-  }
 }

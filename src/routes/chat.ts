@@ -100,7 +100,7 @@ export async function chatRoutes(server: FastifyInstance) {
 
       // Save assistant message(s)
       if (mode === 'EXPERT' && result.providers) {
-        // Save all provider responses
+        // Save all provider responses (no consensus)
         for (const provider of result.providers) {
           await prisma.message.create({
             data: {
@@ -110,19 +110,6 @@ export async function chatRoutes(server: FastifyInstance) {
               shortAnswer: provider.response.shortAnswer,
               provider: provider.provider.toUpperCase() as any,
               metadata: provider.error ? { error: provider.error } : undefined,
-            },
-          });
-        }
-
-        // Save consensus
-        if (result.consensus) {
-          await prisma.message.create({
-            data: {
-              chatSessionId: session.id,
-              role: 'ASSISTANT',
-              content: JSON.stringify({ steps: result.consensus.steps }),
-              shortAnswer: result.consensus.shortAnswer,
-              provider: 'CONSENSUS',
             },
           });
         }
@@ -254,6 +241,7 @@ export async function chatRoutes(server: FastifyInstance) {
 
       // Save response(s)
       if (effectiveMode === 'EXPERT' && result.providers) {
+        // Save all provider responses (no consensus)
         for (const provider of result.providers) {
           await prisma.message.create({
             data: {
@@ -263,18 +251,6 @@ export async function chatRoutes(server: FastifyInstance) {
               shortAnswer: provider.response.shortAnswer,
               provider: provider.provider.toUpperCase() as any,
               metadata: provider.error ? { error: provider.error } : undefined,
-            },
-          });
-        }
-
-        if (result.consensus) {
-          await prisma.message.create({
-            data: {
-              chatSessionId: session.id,
-              role: 'ASSISTANT',
-              content: JSON.stringify({ steps: result.consensus.steps }),
-              shortAnswer: result.consensus.shortAnswer,
-              provider: 'CONSENSUS',
             },
           });
         }
