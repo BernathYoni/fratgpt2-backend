@@ -26,8 +26,8 @@ export class ClaudeProvider implements LLMProvider {
 
     try {
       const model = options?.maxTokens && options.maxTokens < 2000
-        ? 'claude-3-haiku-20240307'
-        : 'claude-3-5-sonnet-20240620';
+        ? 'claude-haiku-4-5-20251001'
+        : 'claude-sonnet-4-5-20250929';
 
       console.log('[CLAUDE] 🤖 Using model:', model);
 
