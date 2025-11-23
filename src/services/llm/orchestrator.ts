@@ -151,7 +151,7 @@ export class LLMOrchestrator {
           provider: providerName,
           response: {
             shortAnswer: 'Error',
-            explanation: 'Failed to get response',
+            steps: ['Failed to get response from this provider'],
           },
           error: result.reason?.message || 'Unknown error',
         };

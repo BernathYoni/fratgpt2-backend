@@ -106,7 +106,7 @@ export async function chatRoutes(server: FastifyInstance) {
             data: {
               chatSessionId: session.id,
               role: 'ASSISTANT',
-              content: provider.response.explanation,
+              content: JSON.stringify({ steps: provider.response.steps }),
               shortAnswer: provider.response.shortAnswer,
               provider: provider.provider.toUpperCase() as any,
               metadata: provider.error ? { error: provider.error } : undefined,
@@ -120,7 +120,7 @@ export async function chatRoutes(server: FastifyInstance) {
             data: {
               chatSessionId: session.id,
               role: 'ASSISTANT',
-              content: result.consensus.explanation,
+              content: JSON.stringify({ steps: result.consensus.steps }),
               shortAnswer: result.consensus.shortAnswer,
               provider: 'CONSENSUS',
             },
@@ -132,7 +132,7 @@ export async function chatRoutes(server: FastifyInstance) {
           data: {
             chatSessionId: session.id,
             role: 'ASSISTANT',
-            content: result.primary.explanation,
+            content: JSON.stringify({ steps: result.primary.steps }),
             shortAnswer: result.primary.shortAnswer,
             provider: mode === 'FAST' ? 'GEMINI' : 'GEMINI',
           },
@@ -259,7 +259,7 @@ export async function chatRoutes(server: FastifyInstance) {
             data: {
               chatSessionId: session.id,
               role: 'ASSISTANT',
-              content: provider.response.explanation,
+              content: JSON.stringify({ steps: provider.response.steps }),
               shortAnswer: provider.response.shortAnswer,
               provider: provider.provider.toUpperCase() as any,
               metadata: provider.error ? { error: provider.error } : undefined,
@@ -272,7 +272,7 @@ export async function chatRoutes(server: FastifyInstance) {
             data: {
               chatSessionId: session.id,
               role: 'ASSISTANT',
-              content: result.consensus.explanation,
+              content: JSON.stringify({ steps: result.consensus.steps }),
               shortAnswer: result.consensus.shortAnswer,
               provider: 'CONSENSUS',
             },
@@ -283,7 +283,7 @@ export async function chatRoutes(server: FastifyInstance) {
           data: {
             chatSessionId: session.id,
             role: 'ASSISTANT',
-            content: result.primary.explanation,
+            content: JSON.stringify({ steps: result.primary.steps }),
             shortAnswer: result.primary.shortAnswer,
             provider: 'GEMINI',
           },
