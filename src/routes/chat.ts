@@ -43,21 +43,8 @@ export async function chatRoutes(server: FastifyInstance) {
       console.log('[CHAT/START] Image size:', imageData ? `${(imageData.length / 1024).toFixed(2)} KB` : 'N/A');
       console.log('[CHAT/START] Capture source:', captureSource);
 
-      // Check rate limit
-      console.log('[CHAT/START] 📊 Checking rate limit...');
-      const usageCheck = await UsageService.checkLimit(userId);
-      console.log('[CHAT/START] Rate limit check:', usageCheck);
-
-      if (!usageCheck.allowed) {
-        console.log('[CHAT/START] ❌ Rate limit exceeded!');
-        return reply.code(429).send({
-          error: 'Daily limit reached',
-          code: 'DAILY_LIMIT_REACHED',
-          plan: usageCheck.plan,
-          limit: usageCheck.limit,
-          used: usageCheck.used,
-        });
-      }
+      // Rate limiting disabled for testing
+      console.log('[CHAT/START] 📊 Rate limiting disabled for testing');
 
       // Create chat session
       console.log('[CHAT/START] 💾 Creating chat session...');
@@ -152,8 +139,8 @@ export async function chatRoutes(server: FastifyInstance) {
         });
       }
 
-      // Increment usage
-      await UsageService.incrementSolve(userId, mode as ChatMode, result.primary.tokensUsed);
+      // Usage tracking disabled for testing
+      console.log('[CHAT/START] 📊 Usage tracking disabled for testing');
 
       // Return session with messages
       const fullSession = await prisma.chatSession.findUnique({
@@ -225,17 +212,8 @@ export async function chatRoutes(server: FastifyInstance) {
         });
       }
 
-      // Check rate limit
-      const usageCheck = await UsageService.checkLimit(userId);
-      if (!usageCheck.allowed) {
-        return reply.code(429).send({
-          error: 'Daily limit reached',
-          code: 'DAILY_LIMIT_REACHED',
-          plan: usageCheck.plan,
-          limit: usageCheck.limit,
-          used: usageCheck.used,
-        });
-      }
+      // Rate limiting disabled for testing
+      console.log('[CHAT/MESSAGE] 📊 Rate limiting disabled for testing');
 
       // Create user message
       await prisma.message.create({
@@ -312,8 +290,8 @@ export async function chatRoutes(server: FastifyInstance) {
         });
       }
 
-      // Increment usage with effective mode
-      await UsageService.incrementSolve(userId, effectiveMode as ChatMode, result.primary.tokensUsed);
+      // Usage tracking disabled for testing
+      console.log('[CHAT/MESSAGE] 📊 Usage tracking disabled for testing');
 
       // Return updated session
       const updatedSession = await prisma.chatSession.findUnique({
