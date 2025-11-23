@@ -20,66 +20,91 @@ export class ClaudeProvider implements LLMProvider {
   }
 
   async generate(messages: LLMMessage[], options?: LLMOptions): Promise<LLMResponse> {
-    const model = options?.maxTokens && options.maxTokens < 2000
-      ? 'claude-3-haiku-20240307'
-      : 'claude-3-5-sonnet-20241022';
+    console.log('[CLAUDE] 🚀 Starting generate');
+    console.log('[CLAUDE] 📨 Messages count:', messages.length);
+    console.log('[CLAUDE] ⚙️ Options:', options);
 
-    // Build messages array
-    const claudeMessages: Anthropic.MessageParam[] = [];
+    try {
+      const model = options?.maxTokens && options.maxTokens < 2000
+        ? 'claude-3-haiku-20240307'
+        : 'claude-3-5-sonnet-20241022';
 
-    for (const msg of messages) {
-      const content: any[] = [];
+      console.log('[CLAUDE] 🤖 Using model:', model);
 
-      if (msg.imageData) {
+      // Build messages array
+      const claudeMessages: Anthropic.MessageParam[] = [];
+
+      for (const msg of messages) {
+        const content: any[] = [];
+
+        if (msg.imageData) {
+          console.log('[CLAUDE] 🖼️ Message has image data');
+          content.push({
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: 'image/png',
+              data: msg.imageData.replace(/^data:image\/\w+;base64,/, ''),
+            },
+          });
+        }
+
         content.push({
-          type: 'image',
-          source: {
-            type: 'base64',
-            media_type: 'image/png',
-            data: msg.imageData.replace(/^data:image\/\w+;base64,/, ''),
-          },
+          type: 'text',
+          text: msg.content,
+        });
+
+        claudeMessages.push({
+          role: msg.role === 'user' ? 'user' : 'assistant',
+          content,
         });
       }
 
-      content.push({
-        type: 'text',
-        text: msg.content,
+      console.log('[CLAUDE] 📤 Sending request to Anthropic API...');
+      const response = await this.client.messages.create({
+        model,
+        max_tokens: options?.maxTokens || 2048,
+        temperature: options?.temperature || 0.7,
+        system: options?.systemPrompt || SYSTEM_PROMPT,
+        messages: claudeMessages,
       });
 
-      claudeMessages.push({
-        role: msg.role === 'user' ? 'user' : 'assistant',
-        content,
-      });
-    }
+      console.log('[CLAUDE] ✅ Response received from Anthropic API');
+      console.log('[CLAUDE] 📊 Tokens used:', response.usage.input_tokens + response.usage.output_tokens);
 
-    const response = await this.client.messages.create({
-      model,
-      max_tokens: options?.maxTokens || 2048,
-      temperature: options?.temperature || 0.7,
-      system: options?.systemPrompt || SYSTEM_PROMPT,
-      messages: claudeMessages,
-    });
+      const text = response.content
+        .filter((block: any) => block.type === 'text')
+        .map((block: any) => block.text)
+        .join('\n');
 
-    const text = response.content
-      .filter((block: any) => block.type === 'text')
-      .map((block: any) => block.text)
-      .join('\n');
+      console.log('[CLAUDE] 📝 Response text length:', text.length);
+      console.log('[CLAUDE] 📝 Response text preview:', text.substring(0, 200));
 
-    // Parse JSON response
-    try {
-      const parsed = this.extractJSON(text);
-      return {
-        shortAnswer: parsed.shortAnswer || 'No answer provided',
-        explanation: parsed.explanation || text,
-        tokensUsed: response.usage.input_tokens + response.usage.output_tokens,
-      };
-    } catch (error) {
-      // Fallback
-      return {
-        shortAnswer: 'See explanation',
-        explanation: text,
-        tokensUsed: response.usage.input_tokens + response.usage.output_tokens,
-      };
+      // Parse JSON response
+      try {
+        const parsed = this.extractJSON(text);
+        console.log('[CLAUDE] ✅ Successfully parsed JSON response');
+        return {
+          shortAnswer: parsed.shortAnswer || 'No answer provided',
+          explanation: parsed.explanation || text,
+          tokensUsed: response.usage.input_tokens + response.usage.output_tokens,
+        };
+      } catch (error) {
+        console.error('[CLAUDE] ⚠️ Failed to parse JSON, using fallback:', error);
+        // Fallback
+        return {
+          shortAnswer: 'See explanation',
+          explanation: text,
+          tokensUsed: response.usage.input_tokens + response.usage.output_tokens,
+        };
+      }
+    } catch (error: any) {
+      console.error('[CLAUDE] ❌ ERROR in generate:');
+      console.error('[CLAUDE] ❌ Error name:', error?.name);
+      console.error('[CLAUDE] ❌ Error message:', error?.message);
+      console.error('[CLAUDE] ❌ Error status:', error?.status);
+      console.error('[CLAUDE] ❌ Full error:', error);
+      throw error; // Re-throw so orchestrator can catch it
     }
   }
 
