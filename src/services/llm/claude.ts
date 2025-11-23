@@ -105,8 +105,10 @@ export class ClaudeProvider implements LLMProvider {
         .map((block: any) => block.text)
         .join('\n');
 
-      console.log('[CLAUDE] 📝 Response text length:', text.length);
-      console.log('[CLAUDE] 📝 Response text preview:', text.substring(0, 200));
+      console.log('[CLAUDE] 📝 RAW RESPONSE:');
+      console.log('[CLAUDE] ═══════════════════════════════════════════════════════════');
+      console.log(text);
+      console.log('[CLAUDE] ═══════════════════════════════════════════════════════════');
 
       // Parse JSON response with STRICT validation
       try {

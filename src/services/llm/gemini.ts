@@ -82,6 +82,11 @@ export class GeminiProvider implements LLMProvider {
     const response = result.response;
     const text = response.text();
 
+    console.log('[GEMINI] 📝 RAW RESPONSE:');
+    console.log('[GEMINI] ═══════════════════════════════════════════════════════════');
+    console.log(text);
+    console.log('[GEMINI] ═══════════════════════════════════════════════════════════');
+
     // Parse JSON response with STRICT validation
     try {
       const parsed = this.extractJSON(text);

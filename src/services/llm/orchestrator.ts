@@ -135,6 +135,9 @@ export class LLMOrchestrator {
    * Expert mode: Call all 3 providers, then consensus
    */
   private async generateExpert(messages: LLMMessage[]) {
+    console.log('[EXPERT] 🚀 Starting Expert mode generation');
+    console.log('[EXPERT] 📤 Calling all 3 providers in parallel...');
+
     // Call all providers in parallel
     const results = await Promise.allSettled([
       this.gemini.generate(messages).then(r => ({ provider: 'gemini', response: r })),
@@ -142,11 +145,22 @@ export class LLMOrchestrator {
       this.claude.generate(messages).then(r => ({ provider: 'claude', response: r })),
     ]);
 
+    console.log('[EXPERT] 📊 All provider calls completed');
+    console.log('[EXPERT] ═══════════════════════════════════════════════════════════');
+
     const providers: ProviderResult[] = results.map((result, idx) => {
       const providerName = ['gemini', 'openai', 'claude'][idx];
+
       if (result.status === 'fulfilled') {
+        console.log(`[EXPERT] ✅ ${providerName.toUpperCase()} SUCCESS`);
+        console.log(`[EXPERT]    shortAnswer: "${result.value.response.shortAnswer}"`);
+        console.log(`[EXPERT]    steps count: ${result.value.response.steps.length}`);
+        console.log(`[EXPERT]    steps:`, JSON.stringify(result.value.response.steps, null, 2));
         return result.value;
       } else {
+        console.error(`[EXPERT] ❌ ${providerName.toUpperCase()} FAILED`);
+        console.error(`[EXPERT]    Error: ${result.reason?.message || 'Unknown error'}`);
+        console.error(`[EXPERT]    Stack: ${result.reason?.stack || 'No stack trace'}`);
         return {
           provider: providerName,
           response: {
@@ -158,8 +172,12 @@ export class LLMOrchestrator {
       }
     });
 
+    console.log('[EXPERT] ═══════════════════════════════════════════════════════════');
+
     // Create consensus
+    console.log('[EXPERT] 🤝 Creating consensus from all provider results...');
     const consensus = await this.createConsensus(providers, messages);
+    console.log('[EXPERT] ✅ Consensus created successfully');
 
     return {
       primary: consensus,
@@ -172,6 +190,8 @@ export class LLMOrchestrator {
    * Create consensus from multiple provider responses
    */
   private async createConsensus(providers: ProviderResult[], originalMessages: LLMMessage[]): Promise<LLMResponse> {
+    console.log('[CONSENSUS] 🔧 Building consensus prompt...');
+
     const providersText = providers
       .map(p => {
         if (p.error) {
@@ -182,12 +202,22 @@ export class LLMOrchestrator {
       })
       .join('\n\n---\n\n');
 
+    const userPrompt = `Original question: ${originalMessages[originalMessages.length - 1]?.content || 'N/A'}\n\nHere are the responses from three AI models:\n\n${providersText}`;
+
+    console.log('[CONSENSUS] 📝 CONSENSUS INPUT PROMPT:');
+    console.log('[CONSENSUS] ═══════════════════════════════════════════════════════════');
+    console.log(userPrompt);
+    console.log('[CONSENSUS] ═══════════════════════════════════════════════════════════');
+
     const consensusMessages: LLMMessage[] = [
       {
         role: 'user',
-        content: `Original question: ${originalMessages[originalMessages.length - 1]?.content || 'N/A'}\n\nHere are the responses from three AI models:\n\n${providersText}`,
+        content: userPrompt,
       },
     ];
+
+    console.log('[CONSENSUS] 📤 Calling Gemini Flash for consensus analysis...');
+    console.log('[CONSENSUS] ⚙️ Config: maxTokens=1024, temperature=0.3');
 
     // Use Gemini Flash for consensus (cheaper)
     const consensusResponse = await this.gemini.generate(consensusMessages, {
@@ -195,6 +225,11 @@ export class LLMOrchestrator {
       maxTokens: 1024,
       temperature: 0.3,
     });
+
+    console.log('[CONSENSUS] ✅ CONSENSUS RESULT:');
+    console.log('[CONSENSUS]    shortAnswer:', consensusResponse.shortAnswer);
+    console.log('[CONSENSUS]    steps count:', consensusResponse.steps.length);
+    console.log('[CONSENSUS]    steps:', JSON.stringify(consensusResponse.steps, null, 2));
 
     return consensusResponse;
   }

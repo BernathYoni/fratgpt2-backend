@@ -91,6 +91,11 @@ export class OpenAIProvider implements LLMProvider {
 
     const text = completion.choices[0]?.message?.content || '{}';
 
+    console.log('[OPENAI] 📝 RAW RESPONSE:');
+    console.log('[OPENAI] ═══════════════════════════════════════════════════════════');
+    console.log(text);
+    console.log('[OPENAI] ═══════════════════════════════════════════════════════════');
+
     // Parse JSON response with STRICT validation
     try {
       const parsed = JSON.parse(text);
