@@ -49,16 +49,19 @@ export class ClaudeProvider implements LLMProvider {
   }
 
   async generate(messages: LLMMessage[], options?: LLMOptions): Promise<LLMResponse> {
-    console.log('[CLAUDE] 🚀 Starting generate');
+    const model = options?.maxTokens && options.maxTokens < 2000
+      ? 'claude-haiku-4-5-20251001'
+      : 'claude-sonnet-4-5-20250929';
+
+    console.log('[CLAUDE] 🚀 Starting generation');
+    console.log('[CLAUDE] 📊 Model:', model);
+    console.log('[CLAUDE] ⚙️  Config:', {
+      temperature: options?.temperature || 0.7,
+      maxTokens: options?.maxTokens || 2048,
+    });
     console.log('[CLAUDE] 📨 Messages count:', messages.length);
-    console.log('[CLAUDE] ⚙️ Options:', options);
 
     try {
-      const model = options?.maxTokens && options.maxTokens < 2000
-        ? 'claude-haiku-4-5-20251001'
-        : 'claude-sonnet-4-5-20250929';
-
-      console.log('[CLAUDE] 🤖 Using model:', model);
 
       // Build messages array
       const claudeMessages: Anthropic.MessageParam[] = [];
@@ -67,7 +70,9 @@ export class ClaudeProvider implements LLMProvider {
         const content: any[] = [];
 
         if (msg.imageData) {
-          console.log('[CLAUDE] 🖼️ Message has image data');
+          const imageSize = msg.imageData.length;
+          console.log('[CLAUDE] 🖼️  Image detected, size:', (imageSize / 1024).toFixed(2), 'KB');
+
           content.push({
             type: 'image',
             source: {
@@ -98,8 +103,21 @@ export class ClaudeProvider implements LLMProvider {
         messages: claudeMessages,
       });
 
-      console.log('[CLAUDE] ✅ Response received from Anthropic API');
+      console.log('[CLAUDE] 📥 Received response from Anthropic API');
+      console.log('[CLAUDE] 🔍 FULL API RESPONSE OBJECT:');
+      console.log('[CLAUDE] ═══════════════════════════════════════════════════════════');
+      console.log(JSON.stringify(response, null, 2));
+      console.log('[CLAUDE] ═══════════════════════════════════════════════════════════');
+
+      console.log('[CLAUDE] 🔍 Response ID:', response.id);
+      console.log('[CLAUDE] 🔍 Stop reason:', response.stop_reason);
+      console.log('[CLAUDE] 🔍 Content blocks:', response.content?.length ?? 0);
       console.log('[CLAUDE] 📊 Tokens used:', response.usage.input_tokens + response.usage.output_tokens);
+
+      if (response.stop_reason && response.stop_reason !== 'end_turn') {
+        console.error('[CLAUDE] ⚠️  WARNING: Stop reason is not end_turn:', response.stop_reason);
+        console.error('[CLAUDE] ⚠️  This may indicate content was filtered or max tokens reached');
+      }
 
       const text = response.content
         .filter((block: any) => block.type === 'text')

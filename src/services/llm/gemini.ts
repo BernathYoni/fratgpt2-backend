@@ -49,9 +49,18 @@ export class GeminiProvider implements LLMProvider {
   }
 
   async generate(messages: LLMMessage[], options?: LLMOptions): Promise<LLMResponse> {
-    const model = options?.maxTokens && options.maxTokens < 2000
-      ? this.client.getGenerativeModel({ model: 'gemini-2.5-flash' })
-      : this.client.getGenerativeModel({ model: 'gemini-2.5-pro' });
+    const modelName = options?.maxTokens && options.maxTokens < 2000
+      ? 'gemini-2.5-flash'
+      : 'gemini-2.5-pro';
+
+    console.log('[GEMINI] 🚀 Starting generation');
+    console.log('[GEMINI] 📊 Model:', modelName);
+    console.log('[GEMINI] ⚙️  Config:', {
+      temperature: options?.temperature || 0.7,
+      maxTokens: options?.maxTokens || 2048,
+    });
+
+    const model = this.client.getGenerativeModel({ model: modelName });
 
     // Build the prompt
     const parts: any[] = [];
@@ -62,6 +71,10 @@ export class GeminiProvider implements LLMProvider {
     // Add conversation history
     for (const msg of messages) {
       if (msg.imageData) {
+        const imageSize = msg.imageData.length;
+        console.log('[GEMINI] 🖼️  Image detected, size:', (imageSize / 1024).toFixed(2), 'KB');
+        console.log('[GEMINI] 🖼️  Image format:', msg.imageData.substring(0, 30) + '...');
+
         parts.push({
           inlineData: {
             mimeType: 'image/png',
@@ -72,6 +85,7 @@ export class GeminiProvider implements LLMProvider {
       parts.push({ text: `${msg.role}: ${msg.content}` });
     }
 
+    console.log('[GEMINI] 📤 Sending request to Gemini API...');
     const result = await model.generateContent({
       contents: [{ role: 'user', parts }],
       generationConfig: {
@@ -80,7 +94,29 @@ export class GeminiProvider implements LLMProvider {
       },
     });
 
+    console.log('[GEMINI] 📥 Received response from Gemini API');
+    console.log('[GEMINI] 🔍 FULL API RESPONSE OBJECT:');
+    console.log('[GEMINI] ═══════════════════════════════════════════════════════════');
+    console.log(JSON.stringify(result, null, 2));
+    console.log('[GEMINI] ═══════════════════════════════════════════════════════════');
+
     const response = result.response;
+
+    console.log('[GEMINI] 🔍 Response object type:', typeof response);
+    console.log('[GEMINI] 🔍 Response candidates:', response.candidates?.length ?? 0);
+
+    // Check for safety blocks or finish reasons
+    if (response.candidates && response.candidates.length > 0) {
+      const candidate = response.candidates[0];
+      console.log('[GEMINI] 🔍 Candidate finish reason:', candidate.finishReason);
+      console.log('[GEMINI] 🔍 Candidate safety ratings:', JSON.stringify(candidate.safetyRatings, null, 2));
+
+      if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+        console.error('[GEMINI] ⚠️  WARNING: Finish reason is not STOP:', candidate.finishReason);
+        console.error('[GEMINI] ⚠️  This may indicate content was blocked or generation failed');
+      }
+    }
+
     const text = response.text();
 
     console.log('[GEMINI] 📝 RAW RESPONSE:');

@@ -25,10 +25,23 @@ export class ExpertParser {
 
     console.log(`[PARSER:${providerName.toUpperCase()}] 🔍 Starting multi-stage parse`);
     console.log(`[PARSER:${providerName.toUpperCase()}] Raw response length: ${rawResponse.length}`);
+    console.log(`[PARSER:${providerName.toUpperCase()}] Raw response type: ${typeof rawResponse}`);
 
     // STAGE 0: Check for empty response
     if (!rawResponse || rawResponse.trim().length === 0) {
-      console.error(`[PARSER:${providerName.toUpperCase()}] ❌ Empty response received`);
+      console.error(`[PARSER:${providerName.toUpperCase()}] ❌❌❌ EMPTY RESPONSE DETECTED ❌❌❌`);
+      console.error(`[PARSER:${providerName.toUpperCase()}] rawResponse value: "${rawResponse}"`);
+      console.error(`[PARSER:${providerName.toUpperCase()}] rawResponse type: ${typeof rawResponse}`);
+      console.error(`[PARSER:${providerName.toUpperCase()}] rawResponse is null: ${rawResponse === null}`);
+      console.error(`[PARSER:${providerName.toUpperCase()}] rawResponse is undefined: ${rawResponse === undefined}`);
+      console.error(`[PARSER:${providerName.toUpperCase()}] rawResponse length: ${rawResponse?.length ?? 'N/A'}`);
+      console.error(`[PARSER:${providerName.toUpperCase()}] ⚠️  POSSIBLE CAUSES:`);
+      console.error(`[PARSER:${providerName.toUpperCase()}]    1. API quota/rate limit exceeded`);
+      console.error(`[PARSER:${providerName.toUpperCase()}]    2. Content policy violation (safety filter)`);
+      console.error(`[PARSER:${providerName.toUpperCase()}]    3. Image too large or corrupted`);
+      console.error(`[PARSER:${providerName.toUpperCase()}]    4. API key invalid or expired`);
+      console.error(`[PARSER:${providerName.toUpperCase()}]    5. Network timeout during generation`);
+      console.error(`[PARSER:${providerName.toUpperCase()}]    6. Provider API error (check logs above)`);
       return this.createErrorResponse('EMPTY_RESPONSE', 'The AI returned an empty response', attempts);
     }
 

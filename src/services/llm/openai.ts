@@ -53,6 +53,13 @@ export class OpenAIProvider implements LLMProvider {
       ? 'gpt-4o-mini'
       : 'gpt-4o';
 
+    console.log('[OPENAI] 🚀 Starting generation');
+    console.log('[OPENAI] 📊 Model:', model);
+    console.log('[OPENAI] ⚙️  Config:', {
+      temperature: options?.temperature || 0.7,
+      maxTokens: options?.maxTokens || 2048,
+    });
+
     // Build messages array
     const openaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: 'system', content: options?.systemPrompt || SYSTEM_PROMPT },
@@ -60,6 +67,9 @@ export class OpenAIProvider implements LLMProvider {
 
     for (const msg of messages) {
       if (msg.imageData && msg.role === 'user') {
+        const imageSize = msg.imageData.length;
+        console.log('[OPENAI] 🖼️  Image detected, size:', (imageSize / 1024).toFixed(2), 'KB');
+
         openaiMessages.push({
           role: 'user',
           content: [
@@ -82,6 +92,7 @@ export class OpenAIProvider implements LLMProvider {
       }
     }
 
+    console.log('[OPENAI] 📤 Sending request to OpenAI API...');
     const completion = await this.client.chat.completions.create({
       model,
       messages: openaiMessages,
@@ -89,6 +100,21 @@ export class OpenAIProvider implements LLMProvider {
       max_tokens: options?.maxTokens || 2048,
       response_format: { type: 'json_object' },
     });
+
+    console.log('[OPENAI] 📥 Received response from OpenAI API');
+    console.log('[OPENAI] 🔍 FULL API RESPONSE OBJECT:');
+    console.log('[OPENAI] ═══════════════════════════════════════════════════════════');
+    console.log(JSON.stringify(completion, null, 2));
+    console.log('[OPENAI] ═══════════════════════════════════════════════════════════');
+
+    console.log('[OPENAI] 🔍 Choices count:', completion.choices?.length ?? 0);
+    console.log('[OPENAI] 🔍 Finish reason:', completion.choices[0]?.finish_reason);
+    console.log('[OPENAI] 🔍 Usage:', completion.usage);
+
+    if (completion.choices[0]?.finish_reason && completion.choices[0].finish_reason !== 'stop') {
+      console.error('[OPENAI] ⚠️  WARNING: Finish reason is not stop:', completion.choices[0].finish_reason);
+      console.error('[OPENAI] ⚠️  This may indicate content was filtered or generation failed');
+    }
 
     const text = completion.choices[0]?.message?.content || '';
 
