@@ -279,8 +279,8 @@ export class ExpertParser {
         const stepsText = stepsMatch[1];
         steps = stepsText
           .split(',')
-          .map(s => s.trim().replace(/^["']|["']$/g, ''))
-          .filter(s => s.length > 0 && s !== 'null' && s !== 'undefined');
+          .map((s: string) => s.trim().replace(/^["']|["']$/g, ''))
+          .filter((s: string) => s.length > 0 && s !== 'null' && s !== 'undefined');
 
         if (steps.length > 0) {
           warnings.push('Extracted steps from malformed JSON');
@@ -369,8 +369,8 @@ export class ExpertParser {
     let steps: string[];
     if (Array.isArray(parsed.steps)) {
       steps = parsed.steps
-        .map(s => (typeof s === 'string' ? s : String(s)))
-        .filter(s => s.length > 0 && s !== 'null' && s !== 'undefined');
+        .map((s: any) => (typeof s === 'string' ? s : String(s)))
+        .filter((s: string) => s.length > 0 && s !== 'null' && s !== 'undefined');
 
       if (steps.length === 0) {
         steps = ['No steps provided'];
@@ -381,7 +381,7 @@ export class ExpertParser {
       warnings.push('steps was not an array, converted to single-item array');
     } else if (parsed.explanation) {
       steps = Array.isArray(parsed.explanation)
-        ? parsed.explanation.map(String)
+        ? parsed.explanation.map((e: any) => String(e))
         : [String(parsed.explanation)];
       warnings.push('Used "explanation" field instead of "steps"');
     } else {
