@@ -2,7 +2,7 @@ import { ChatMode } from '@prisma/client';
 import { GeminiProvider } from './gemini';
 import { OpenAIProvider } from './openai';
 import { ClaudeProvider } from './claude';
-import { LLMMessage, LLMResponse } from './types';
+import { LLMMessage, LLMResponse, ParseConfidence } from './types';
 
 interface ProviderResult {
   provider: string;
@@ -118,13 +118,31 @@ export class LLMOrchestrator {
       const providerName = ['gemini', 'openai', 'claude'][idx];
 
       if (result.status === 'fulfilled') {
+        const response = result.value.response;
+
         console.log(`[EXPERT] ✅ ${providerName.toUpperCase()} SUCCESS`);
-        console.log(`[EXPERT]    shortAnswer: "${result.value.response.shortAnswer}"`);
-        console.log(`[EXPERT]    steps count: ${result.value.response.steps.length}`);
-        console.log(`[EXPERT]    steps:`, JSON.stringify(result.value.response.steps, null, 2));
+        console.log(`[EXPERT]    shortAnswer: "${response.shortAnswer}"`);
+        console.log(`[EXPERT]    steps count: ${response.steps.length}`);
+        console.log(`[EXPERT]    confidence: ${response.confidence ?? 'N/A'}`);
+        console.log(`[EXPERT]    parseMethod: ${response.parseMethod ?? 'N/A'}`);
+
+        // Log warnings if present
+        if (response.warnings && response.warnings.length > 0) {
+          console.warn(`[EXPERT]    ⚠️  warnings:`, response.warnings);
+        }
+
+        // Check parse quality
+        if (response.confidence && response.confidence < ParseConfidence.MEDIUM) {
+          console.warn(`[EXPERT]    ⚠️  LOW QUALITY PARSE for ${providerName}`);
+        }
+
+        if (response.error) {
+          console.error(`[EXPERT]    ❌ Parse error: ${response.error}`);
+        }
+
         return result.value;
       } else {
-        console.error(`[EXPERT] ❌ ${providerName.toUpperCase()} FAILED`);
+        console.error(`[EXPERT] ❌ ${providerName.toUpperCase()} FAILED (Network/API error)`);
         console.error(`[EXPERT]    Error: ${result.reason?.message || 'Unknown error'}`);
         console.error(`[EXPERT]    Stack: ${result.reason?.stack || 'No stack trace'}`);
         return {
@@ -132,6 +150,8 @@ export class LLMOrchestrator {
           response: {
             shortAnswer: 'Error',
             steps: ['Failed to get response from this provider'],
+            error: 'NETWORK_ERROR',
+            confidence: ParseConfidence.FAILED,
           },
           error: result.reason?.message || 'Unknown error',
         };
@@ -139,11 +159,23 @@ export class LLMOrchestrator {
     });
 
     console.log('[EXPERT] ═══════════════════════════════════════════════════════════');
-    console.log('[EXPERT] ✅ Expert mode complete - returning all provider responses');
 
-    // Use the first successful provider as primary
-    const primaryProvider = providers.find(p => !p.error);
+    // Calculate average parse confidence
+    const avgConfidence = providers.reduce((sum, p) => sum + (p.response.confidence ?? 0), 0) / providers.length;
+    console.log(`[EXPERT] 📊 Average parse confidence: ${avgConfidence.toFixed(2)}`);
+
+    // Use the first successful provider with highest confidence as primary
+    const sortedProviders = [...providers].sort((a, b) => {
+      const confA = a.response.confidence ?? 0;
+      const confB = b.response.confidence ?? 0;
+      return confB - confA;
+    });
+
+    const primaryProvider = sortedProviders.find(p => !p.error && !p.response.error);
     const primary = primaryProvider ? primaryProvider.response : providers[0].response;
+
+    console.log('[EXPERT] ✅ Expert mode complete - returning all provider responses');
+    console.log(`[EXPERT] Primary provider: ${primaryProvider?.provider ?? 'none'}`);
 
     return {
       primary,

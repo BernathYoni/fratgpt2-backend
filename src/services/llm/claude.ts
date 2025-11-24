@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { LLMProvider, LLMMessage, LLMResponse, LLMOptions } from './types';
+import { ExpertParser } from './parser';
 
 const SYSTEM_PROMPT = `You are a professional homework assistant that provides clear, accurate, and helpful explanations.
 
@@ -110,43 +111,37 @@ export class ClaudeProvider implements LLMProvider {
       console.log(text);
       console.log('[CLAUDE] ═══════════════════════════════════════════════════════════');
 
-      // Parse JSON response with STRICT validation
-      try {
-        const parsed = this.extractJSON(text);
+      // Use ExpertParser for robust multi-stage parsing
+      const parser = new ExpertParser({
+        enableSelfHealing: false,
+        fallbackToPartial: true,
+        strictValidation: false,
+        logAllAttempts: true,
+      });
 
-        // VALIDATE: Must have shortAnswer
-        if (!parsed.shortAnswer || typeof parsed.shortAnswer !== 'string') {
-          console.error('[CLAUDE] ❌ CRITICAL: Missing or invalid shortAnswer');
-          console.error('[CLAUDE] ❌ Raw response:', text);
-          throw new Error('Invalid response: missing or invalid shortAnswer');
-        }
+      const parsed = await parser.parse(text, 'claude');
 
-        // VALIDATE: Must have steps array
-        if (!Array.isArray(parsed.steps) || parsed.steps.length === 0) {
-          console.error('[CLAUDE] ❌ CRITICAL: Missing or invalid steps array');
-          console.error('[CLAUDE] ❌ Raw response:', text);
-          throw new Error('Invalid response: missing or invalid steps array');
-        }
+      // Add token usage
+      parsed.tokensUsed = response.usage.input_tokens + response.usage.output_tokens;
 
-        // VALIDATE: All steps must be strings
-        if (!parsed.steps.every((step: any) => typeof step === 'string')) {
-          console.error('[CLAUDE] ❌ CRITICAL: All steps must be strings');
-          console.error('[CLAUDE] ❌ Raw response:', text);
-          throw new Error('Invalid response: all steps must be strings');
-        }
-
-        console.log('[CLAUDE] ✅ Valid JSON with', parsed.steps.length, 'steps');
-        return {
-          shortAnswer: parsed.shortAnswer,
-          steps: parsed.steps,
-          tokensUsed: response.usage.input_tokens + response.usage.output_tokens,
-        };
-      } catch (error: any) {
-        console.error('[CLAUDE] ❌ CRITICAL: LLM returned invalid JSON format');
-        console.error('[CLAUDE] ❌ Error:', error.message);
-        console.error('[CLAUDE] ❌ Raw response:', text);
-        throw new Error(`Claude failed to return proper JSON format: ${error.message}`);
+      // Log parse quality
+      if (parsed.confidence && parsed.confidence < 0.9) {
+        console.warn('[CLAUDE] ⚠️  Low confidence parse:', {
+          confidence: parsed.confidence,
+          method: parsed.parseMethod,
+          warnings: parsed.warnings,
+        });
       }
+
+      if (parsed.parseAttempts && parsed.parseAttempts.length > 1) {
+        console.log('[CLAUDE] 📊 Parse attempts:', parsed.parseAttempts.map(a => ({
+          method: a.method,
+          success: a.success,
+          error: a.error,
+        })));
+      }
+
+      return parsed;
     } catch (error: any) {
       console.error('[CLAUDE] ❌ ERROR in generate:');
       console.error('[CLAUDE] ❌ Error name:', error?.name);
@@ -155,14 +150,5 @@ export class ClaudeProvider implements LLMProvider {
       console.error('[CLAUDE] ❌ Full error:', error);
       throw error; // Re-throw so orchestrator can catch it
     }
-  }
-
-  private extractJSON(text: string): any {
-    // Try to find JSON in the response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
-    }
-    return JSON.parse(text);
   }
 }

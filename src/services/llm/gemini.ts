@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { LLMProvider, LLMMessage, LLMResponse, LLMOptions } from './types';
+import { ExpertParser } from './parser';
 
 const SYSTEM_PROMPT = `You are a professional homework assistant that provides clear, accurate, and helpful explanations.
 
@@ -87,51 +88,36 @@ export class GeminiProvider implements LLMProvider {
     console.log(text);
     console.log('[GEMINI] ═══════════════════════════════════════════════════════════');
 
-    // Parse JSON response with STRICT validation
-    try {
-      const parsed = this.extractJSON(text);
+    // Use ExpertParser for robust multi-stage parsing
+    const parser = new ExpertParser({
+      enableSelfHealing: false, // Disabled to avoid circular dependency
+      fallbackToPartial: true,
+      strictValidation: false,
+      logAllAttempts: true,
+    });
 
-      // VALIDATE: Must have shortAnswer
-      if (!parsed.shortAnswer || typeof parsed.shortAnswer !== 'string') {
-        console.error('[GEMINI] ❌ CRITICAL: Missing or invalid shortAnswer');
-        console.error('[GEMINI] ❌ Raw response:', text);
-        throw new Error('Invalid response: missing or invalid shortAnswer');
-      }
+    const parsed = await parser.parse(text, 'gemini');
 
-      // VALIDATE: Must have steps array
-      if (!Array.isArray(parsed.steps) || parsed.steps.length === 0) {
-        console.error('[GEMINI] ❌ CRITICAL: Missing or invalid steps array');
-        console.error('[GEMINI] ❌ Raw response:', text);
-        throw new Error('Invalid response: missing or invalid steps array');
-      }
+    // Add token usage
+    parsed.tokensUsed = (response as any).usageMetadata?.totalTokenCount;
 
-      // VALIDATE: All steps must be strings
-      if (!parsed.steps.every((step: any) => typeof step === 'string')) {
-        console.error('[GEMINI] ❌ CRITICAL: All steps must be strings');
-        console.error('[GEMINI] ❌ Raw response:', text);
-        throw new Error('Invalid response: all steps must be strings');
-      }
-
-      console.log('[GEMINI] ✅ Valid JSON with', parsed.steps.length, 'steps');
-      return {
-        shortAnswer: parsed.shortAnswer,
-        steps: parsed.steps,
-        tokensUsed: (response as any).usageMetadata?.totalTokenCount,
-      };
-    } catch (error: any) {
-      console.error('[GEMINI] ❌ CRITICAL: LLM returned invalid JSON format');
-      console.error('[GEMINI] ❌ Error:', error.message);
-      console.error('[GEMINI] ❌ Raw response:', text);
-      throw new Error(`Gemini failed to return proper JSON format: ${error.message}`);
+    // Log parse quality
+    if (parsed.confidence && parsed.confidence < 0.9) {
+      console.warn('[GEMINI] ⚠️  Low confidence parse:', {
+        confidence: parsed.confidence,
+        method: parsed.parseMethod,
+        warnings: parsed.warnings,
+      });
     }
-  }
 
-  private extractJSON(text: string): any {
-    // Try to find JSON in the response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+    if (parsed.parseAttempts && parsed.parseAttempts.length > 1) {
+      console.log('[GEMINI] 📊 Parse attempts:', parsed.parseAttempts.map(a => ({
+        method: a.method,
+        success: a.success,
+        error: a.error,
+      })));
     }
-    return JSON.parse(text);
+
+    return parsed;
   }
 }

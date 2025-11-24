@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { LLMProvider, LLMMessage, LLMResponse, LLMOptions } from './types';
+import { ExpertParser } from './parser';
 
 const SYSTEM_PROMPT = `You are a professional homework assistant that provides clear, accurate, and helpful explanations.
 
@@ -89,49 +90,43 @@ export class OpenAIProvider implements LLMProvider {
       response_format: { type: 'json_object' },
     });
 
-    const text = completion.choices[0]?.message?.content || '{}';
+    const text = completion.choices[0]?.message?.content || '';
 
     console.log('[OPENAI] 📝 RAW RESPONSE:');
     console.log('[OPENAI] ═══════════════════════════════════════════════════════════');
     console.log(text);
     console.log('[OPENAI] ═══════════════════════════════════════════════════════════');
 
-    // Parse JSON response with STRICT validation
-    try {
-      const parsed = JSON.parse(text);
+    // Use ExpertParser for robust multi-stage parsing
+    const parser = new ExpertParser({
+      enableSelfHealing: false,
+      fallbackToPartial: true,
+      strictValidation: false,
+      logAllAttempts: true,
+    });
 
-      // VALIDATE: Must have shortAnswer
-      if (!parsed.shortAnswer || typeof parsed.shortAnswer !== 'string') {
-        console.error('[OPENAI] ❌ CRITICAL: Missing or invalid shortAnswer');
-        console.error('[OPENAI] ❌ Raw response:', text);
-        throw new Error('Invalid response: missing or invalid shortAnswer');
-      }
+    const parsed = await parser.parse(text, 'openai');
 
-      // VALIDATE: Must have steps array
-      if (!Array.isArray(parsed.steps) || parsed.steps.length === 0) {
-        console.error('[OPENAI] ❌ CRITICAL: Missing or invalid steps array');
-        console.error('[OPENAI] ❌ Raw response:', text);
-        throw new Error('Invalid response: missing or invalid steps array');
-      }
+    // Add token usage
+    parsed.tokensUsed = completion.usage?.total_tokens;
 
-      // VALIDATE: All steps must be strings
-      if (!parsed.steps.every((step: any) => typeof step === 'string')) {
-        console.error('[OPENAI] ❌ CRITICAL: All steps must be strings');
-        console.error('[OPENAI] ❌ Raw response:', text);
-        throw new Error('Invalid response: all steps must be strings');
-      }
-
-      console.log('[OPENAI] ✅ Valid JSON with', parsed.steps.length, 'steps');
-      return {
-        shortAnswer: parsed.shortAnswer,
-        steps: parsed.steps,
-        tokensUsed: completion.usage?.total_tokens,
-      };
-    } catch (error: any) {
-      console.error('[OPENAI] ❌ CRITICAL: LLM returned invalid JSON format');
-      console.error('[OPENAI] ❌ Error:', error.message);
-      console.error('[OPENAI] ❌ Raw response:', text);
-      throw new Error(`OpenAI failed to return proper JSON format: ${error.message}`);
+    // Log parse quality
+    if (parsed.confidence && parsed.confidence < 0.9) {
+      console.warn('[OPENAI] ⚠️  Low confidence parse:', {
+        confidence: parsed.confidence,
+        method: parsed.parseMethod,
+        warnings: parsed.warnings,
+      });
     }
+
+    if (parsed.parseAttempts && parsed.parseAttempts.length > 1) {
+      console.log('[OPENAI] 📊 Parse attempts:', parsed.parseAttempts.map(a => ({
+        method: a.method,
+        success: a.success,
+        error: a.error,
+      })));
+    }
+
+    return parsed;
   }
 }
