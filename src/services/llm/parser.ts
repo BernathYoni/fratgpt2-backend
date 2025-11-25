@@ -1,7 +1,7 @@
 import { LLMResponse, ParseConfidence, ParseAttempt, ParserOptions } from './types';
 
 /**
- * Expert-level multi-stage parser for LLM responses
+ * Expert-level multi-stage parser for LLM responses with performance timing
  * Implements 6 parsing strategies with graceful degradation
  */
 export class ExpertParser {
