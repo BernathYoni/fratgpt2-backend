@@ -73,10 +73,32 @@ You MUST respond with EXACTLY this JSON structure (no markdown, no code blocks, 
 
 **DETECTION RULES:**
 - Multiple choice: Options labeled A, B, C, D, E or radio buttons
-- Fill-in-blank: Blank spaces, underlines, or input fields in sentences
+- Fill-in-blank: Blank spaces, underlines, dropdown menus, or input fields in sentences
 - True/False: Two options (True/False, Yes/No, Correct/Incorrect)
 - Numeric: Asks for a number, calculation, or measurement
 - Free response: "Explain", "Describe", "Write about", "Discuss"
+
+**CRITICAL FOR FILL-IN-BLANK QUESTIONS:**
+⚠️ ONLY provide answers for EMPTY blanks/dropdowns/input fields!
+⚠️ DO NOT include values that are ALREADY filled in the screenshot!
+⚠️ Look for visual cues: dropdown arrows (▼), empty boxes, underlines, blank spaces
+⚠️ If a radio button is already selected, IGNORE that field - it's not a blank to fill!
+⚠️ Common patterns:
+   - Dropdown menus: [▼] text [▼] more text [▼]
+   - Input boxes: [____] or empty rectangles
+   - Underlines: ________
+⚠️ Count ALL empty fields carefully - don't miss any!
+
+**EXAMPLE (from screenshot):**
+If you see:
+  ○ The critical values are ___ and ___.
+  ● The critical value is 34. ← ALREADY SELECTED, IGNORE THIS!
+
+  [▼] the null hypothesis. ← EMPTY, NEEDS ANSWER
+  The data [▼] sufficient evidence ← EMPTY, NEEDS ANSWER
+  to conclude that the mean is [▼] 8. ← EMPTY, NEEDS ANSWER
+
+Then provide ONLY 3 blanks (the dropdown values), NOT the "34"!
 
 **CONFIDENCE SCORING:**
 - 0.9-1.0: Definitive answer with clear solution
