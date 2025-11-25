@@ -83,10 +83,10 @@ export class LLMOrchestrator {
    * Regular mode: Use high-quality model
    */
   private async generateRegular(messages: LLMMessage[]) {
-    console.log('[REGULAR] Calling Gemini with maxTokens=2048, temp=0.7');
+    console.log('[REGULAR] Calling Gemini with maxTokens=8192, temp=0.7');
     try {
       const response = await this.gemini.generate(messages, {
-        maxTokens: 2048, // Kept at 2048 - new captures use /chat/start (no history)
+        maxTokens: 8192, // Increased from 2048 to account for thinking tokens (2047) + actual response
         temperature: 0.7,
       });
       console.log('[REGULAR] ✅ Gemini responded successfully');
