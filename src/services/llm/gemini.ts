@@ -51,8 +51,8 @@ export class GeminiProvider implements LLMProvider {
 
   async generate(messages: LLMMessage[], options?: LLMOptions): Promise<LLMResponse> {
     const modelName = options?.maxTokens && options.maxTokens < 2000
-      ? 'gemini-2.5-flash'
-      : 'gemini-2.5-pro';
+      ? 'gemini-2.0-flash-001'  // Use 2.0 Flash instead of 2.5
+      : 'gemini-2.0-flash-001';  // TEMPORARY: Use 2.0 Flash for all until thinking token issue resolved
 
     console.log('[GEMINI] 🚀 Starting generation');
     console.log('[GEMINI] 📊 Model:', modelName);

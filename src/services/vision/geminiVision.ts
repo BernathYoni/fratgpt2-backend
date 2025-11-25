@@ -14,7 +14,7 @@ export class GeminiVisionService {
   constructor(apiKey: string) {
     this.genAI = new GoogleGenerativeAI(apiKey);
     // Use Gemini 2.0 Flash for vision (fast + cheap)
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-001' });  // Use stable version, not exp
     this.parser = new ExpertParser();
   }
 
