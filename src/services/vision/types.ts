@@ -40,7 +40,6 @@ export interface ExcludeRegion {
 }
 
 export interface RegionDetectionResponse {
-  platform: 'pearson' | 'khan' | 'mcgraw' | 'cengage' | 'canvas' | 'blackboard' | 'generic';
   questionCount: number;
   regions: QuestionRegion[];
   excludeRegions: ExcludeRegion[];

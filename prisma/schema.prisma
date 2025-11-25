@@ -134,7 +134,6 @@ model Attachment {
   createdAt        DateTime       @default(now())
 
   // Region detection metadata
-  detectedPlatform String?        // 'pearson', 'khan', 'mcgraw', etc.
   regionData       Json?          // Full region detection response
 
   message          Message        @relation(fields: [messageId], references: [id], onDelete: Cascade)

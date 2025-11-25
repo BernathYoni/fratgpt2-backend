@@ -46,6 +46,13 @@ export async function chatRoutes(server: FastifyInstance) {
       console.log('[CHAT/START] Image size:', imageData ? `${(imageData.length / 1024).toFixed(2)} KB` : 'N/A');
       console.log('[CHAT/START] Capture source:', captureSource);
 
+      // Log full base64 image for debugging (can be pasted into Claude for visual analysis)
+      if (imageData) {
+        console.log('[CHAT/START] 🖼️  ========== IMAGE_BASE64_START ==========');
+        console.log(imageData);
+        console.log('[CHAT/START] 🖼️  ========== IMAGE_BASE64_END ==========');
+      }
+
       // Rate limiting disabled for testing
       console.log('[CHAT/START] 📊 Rate limiting disabled for testing');
 
@@ -85,7 +92,6 @@ export async function chatRoutes(server: FastifyInstance) {
 
       // REGION DETECTION (Smart Cache - only on first capture with image)
       let regionData = null;
-      let detectedPlatform = null;
       if (RegionDetectionService.shouldDetectRegions(imageData, true)) {
         console.log('[CHAT/START] 🔍 Running region detection (first capture)...');
         const regionStartTime = Date.now();
@@ -96,17 +102,15 @@ export async function chatRoutes(server: FastifyInstance) {
             false // Don't force, use cache if available
           );
           regionData = detected;
-          detectedPlatform = detected.platform;
           const regionDuration = Date.now() - regionStartTime;
           console.log(`[CHAT/START] ✅ Region detection complete (${regionDuration}ms, fromCache: ${fromCache})`);
-          console.log(`[CHAT/START] 📊 Found ${detected.questionCount} question(s) on ${detected.platform} platform`);
+          console.log(`[CHAT/START] 📊 Found ${detected.questionCount} question(s)`);
 
           // Update attachment with region data
           if (userMessage.attachments[0]) {
             await prisma.attachment.update({
               where: { id: userMessage.attachments[0].id },
               data: {
-                detectedPlatform,
                 regionData: regionData as any,
               },
             });
@@ -252,6 +256,13 @@ export async function chatRoutes(server: FastifyInstance) {
       const { sessionId } = request.params as { sessionId: string };
       const { message, imageData, captureSource, mode } = sendMessageSchema.parse(request.body);
 
+      // Log full base64 image for debugging (can be pasted into Claude for visual analysis)
+      if (imageData) {
+        console.log('[CHAT/MESSAGE] 🖼️  ========== IMAGE_BASE64_START ==========');
+        console.log(imageData);
+        console.log('[CHAT/MESSAGE] 🖼️  ========== IMAGE_BASE64_END ==========');
+      }
+
       // Get session
       const session = await prisma.chatSession.findUnique({
         where: { id: sessionId },
@@ -309,7 +320,6 @@ export async function chatRoutes(server: FastifyInstance) {
 
       // REGION DETECTION (Smart Cache - uses cache if available, only runs on new captures)
       let regionData = null;
-      let detectedPlatform = null;
       const isNewCapture = !!imageData;
       if (RegionDetectionService.shouldDetectRegions(imageData, isNewCapture)) {
         console.log('[CHAT/MESSAGE] 🔍 Checking region detection cache...');
@@ -321,17 +331,15 @@ export async function chatRoutes(server: FastifyInstance) {
             false // Use cache if available
           );
           regionData = detected;
-          detectedPlatform = detected.platform;
           const regionDuration = Date.now() - regionStartTime;
           console.log(`[CHAT/MESSAGE] ✅ Region detection ${fromCache ? 'from CACHE' : 'NEW'} (${regionDuration}ms)`);
-          console.log(`[CHAT/MESSAGE] 📊 Found ${detected.questionCount} question(s) on ${detected.platform} platform`);
+          console.log(`[CHAT/MESSAGE] 📊 Found ${detected.questionCount} question(s)`);
 
           // Update attachment with region data
           if (userMessage.attachments[0]) {
             await prisma.attachment.update({
               where: { id: userMessage.attachments[0].id },
               data: {
-                detectedPlatform,
                 regionData: regionData as any,
               },
             });

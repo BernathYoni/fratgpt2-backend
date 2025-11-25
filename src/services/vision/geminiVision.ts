@@ -91,7 +91,6 @@ export class GeminiVisionService {
       }
 
       console.log('[VISION] 📊 Region detection results:');
-      console.log(`[VISION]    Platform: ${regionData.platform}`);
       console.log(`[VISION]    Questions found: ${regionData.questionCount}`);
       console.log(`[VISION]    Has multiple questions: ${regionData.hasMultipleQuestions}`);
       console.log(`[VISION]    Recommended action: ${regionData.recommendedAction}`);
@@ -123,12 +122,11 @@ export class GeminiVisionService {
 4. Follow the exact schema below
 
 **ANALYSIS TASKS:**
-1. Identify the platform (Pearson, Khan Academy, McGraw-Hill, Canvas, Blackboard, or generic)
-2. Count total questions visible on screen
-3. For each question, provide bounding box coordinates (x, y, width, height) in pixels
-4. Detect question type: multiple-choice, fill-in-blank, true-false, numeric, free-response, matching
-5. Identify components: question text, charts, tables, diagrams, answer options, input fields
-6. Mark regions to EXCLUDE: navigation bars, headers, footers, ads, sidebars, buttons
+1. Count total questions visible on screen
+2. For each question, provide bounding box coordinates (x, y, width, height) in pixels
+3. Detect question type: multiple-choice, fill-in-blank, true-false, numeric, free-response, matching
+4. Identify components: question text, charts, tables, diagrams, answer options, input fields
+5. Mark regions to EXCLUDE: navigation bars, headers, footers, ads, sidebars, buttons
 
 **BOUNDING BOX RULES:**
 - x, y = top-left corner (0, 0 is top-left of image)
@@ -138,7 +136,6 @@ export class GeminiVisionService {
 
 **EXACT JSON SCHEMA:**
 {
-  "platform": "pearson" | "khan" | "mcgraw" | "cengage" | "canvas" | "blackboard" | "generic",
   "questionCount": <number>,
   "regions": [
     {
