@@ -67,7 +67,28 @@ export class GeminiVisionService {
       }
 
       // Extract region data from parsed shortAnswer (contains the JSON)
-      const regionData = JSON.parse(parsed.shortAnswer);
+      console.log('[VISION] 🔍 parsed.shortAnswer type:', typeof parsed.shortAnswer);
+      console.log('[VISION] 🔍 parsed.shortAnswer value:', parsed.shortAnswer);
+
+      let regionData;
+      try {
+        // The parser returns the JSON as a string in shortAnswer, we need to parse it
+        regionData = JSON.parse(parsed.shortAnswer);
+      } catch (parseError: any) {
+        console.error('[VISION] ❌ Failed to parse shortAnswer as JSON');
+        console.error('[VISION] shortAnswer content:', parsed.shortAnswer);
+        console.error('[VISION] Parse error:', parseError.message);
+
+        // Fallback: try to extract from rawResponse directly
+        console.log('[VISION] 🔄 Attempting direct JSON extraction from raw response...');
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          regionData = JSON.parse(jsonMatch[0]);
+          console.log('[VISION] ✅ Successfully extracted via fallback regex');
+        } else {
+          throw new Error(`Failed to extract region data: ${parseError.message}`);
+        }
+      }
 
       console.log('[VISION] 📊 Region detection results:');
       console.log(`[VISION]    Platform: ${regionData.platform}`);
