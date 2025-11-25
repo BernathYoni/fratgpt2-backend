@@ -65,10 +65,10 @@ export class LLMOrchestrator {
    * Fast mode: Use cheaper/faster model
    */
   private async generateFast(messages: LLMMessage[]) {
-    console.log('[FAST] Calling Gemini with maxTokens=1024, temp=0.5');
+    console.log('[FAST] Calling Gemini with maxTokens=4096, temp=0.5');
     try {
       const response = await this.gemini.generate(messages, {
-        maxTokens: 1024,
+        maxTokens: 4096, // Increased from 1024 to allow for longer responses
         temperature: 0.5,
       });
       console.log('[FAST] ✅ Gemini responded successfully');
