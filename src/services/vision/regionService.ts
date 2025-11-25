@@ -1,6 +1,7 @@
 import { GeminiVisionService } from './geminiVision';
 import { RegionDetectionResponse } from './types';
 import { prisma } from '../../db/client';
+import { Prisma } from '@prisma/client';
 
 /**
  * Region Detection Service with Smart Caching
@@ -34,7 +35,7 @@ export class RegionDetectionService {
       console.log('[REGION_SERVICE] ✅ Using cached region data (smart cache hit)');
       console.log('[REGION_SERVICE] 💰 Saved ~$0.00075 and ~2-3 seconds');
       return {
-        regionData: session.cachedRegionData as RegionDetectionResponse,
+        regionData: session.cachedRegionData as unknown as RegionDetectionResponse,
         fromCache: true,
       };
     }
@@ -50,7 +51,7 @@ export class RegionDetectionService {
     await prisma.chatSession.update({
       where: { id: sessionId },
       data: {
-        cachedRegionData: regionData as any,
+        cachedRegionData: regionData as unknown as Prisma.InputJsonValue,
         skipRegionDetection: true, // Enable cache for next capture
       },
     });
@@ -70,7 +71,7 @@ export class RegionDetectionService {
     await prisma.chatSession.update({
       where: { id: sessionId },
       data: {
-        cachedRegionData: null,
+        cachedRegionData: Prisma.DbNull,
         skipRegionDetection: false,
       },
     });
