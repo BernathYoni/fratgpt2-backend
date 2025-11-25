@@ -21,6 +21,7 @@ export class ExpertParser {
    * Main entry point: Parse raw LLM response with cascading strategies
    */
   async parse(rawResponse: string, providerName: string = 'unknown'): Promise<LLMResponse> {
+    const parseStartTime = Date.now(); // ⏱️ Track total parse time
     const attempts: ParseAttempt[] = [];
 
     console.log(`[PARSER:${providerName.toUpperCase()}] 🔍 Starting multi-stage parse`);
@@ -46,49 +47,65 @@ export class ExpertParser {
     }
 
     // STAGE 1: Direct JSON parse
+    let stageStart = Date.now();
     const directAttempt = this.attemptDirectParse(rawResponse);
     attempts.push(directAttempt);
+    console.log(`[PARSER:${providerName.toUpperCase()}] ⏱️  Stage 1 (direct parse): ${Date.now() - stageStart}ms`);
     if (directAttempt.success) {
-      console.log(`[PARSER:${providerName.toUpperCase()}] ✅ SUCCESS via direct parse`);
+      const totalTime = Date.now() - parseStartTime;
+      console.log(`[PARSER:${providerName.toUpperCase()}] ✅ SUCCESS via direct parse (${totalTime}ms total)`);
       return this.finalizeResponse(directAttempt.result, ParseConfidence.HIGH, 'direct_json', attempts);
     }
 
     // STAGE 2: Regex extraction
+    stageStart = Date.now();
     const regexAttempt = this.attemptRegexExtraction(rawResponse);
     attempts.push(regexAttempt);
+    console.log(`[PARSER:${providerName.toUpperCase()}] ⏱️  Stage 2 (regex): ${Date.now() - stageStart}ms`);
     if (regexAttempt.success) {
-      console.log(`[PARSER:${providerName.toUpperCase()}] ✅ SUCCESS via regex extraction`);
+      const totalTime = Date.now() - parseStartTime;
+      console.log(`[PARSER:${providerName.toUpperCase()}] ✅ SUCCESS via regex extraction (${totalTime}ms total)`);
       return this.finalizeResponse(regexAttempt.result, ParseConfidence.HIGH, 'regex', attempts);
     }
 
     // STAGE 3: Cleanup and retry
+    stageStart = Date.now();
     const cleanupAttempt = this.attemptCleanupParse(rawResponse);
     attempts.push(cleanupAttempt);
+    console.log(`[PARSER:${providerName.toUpperCase()}] ⏱️  Stage 3 (cleanup): ${Date.now() - stageStart}ms`);
     if (cleanupAttempt.success) {
-      console.log(`[PARSER:${providerName.toUpperCase()}] ✅ SUCCESS via cleanup parse`);
+      const totalTime = Date.now() - parseStartTime;
+      console.log(`[PARSER:${providerName.toUpperCase()}] ✅ SUCCESS via cleanup parse (${totalTime}ms total)`);
       return this.finalizeResponse(cleanupAttempt.result, ParseConfidence.MEDIUM, 'cleanup', attempts);
     }
 
     // STAGE 4: Aggressive extraction
+    stageStart = Date.now();
     const aggressiveAttempt = this.attemptAggressiveExtraction(rawResponse);
     attempts.push(aggressiveAttempt);
+    console.log(`[PARSER:${providerName.toUpperCase()}] ⏱️  Stage 4 (aggressive): ${Date.now() - stageStart}ms`);
     if (aggressiveAttempt.success) {
-      console.log(`[PARSER:${providerName.toUpperCase()}] ✅ SUCCESS via aggressive extraction`);
+      const totalTime = Date.now() - parseStartTime;
+      console.log(`[PARSER:${providerName.toUpperCase()}] ✅ SUCCESS via aggressive extraction (${totalTime}ms total)`);
       return this.finalizeResponse(aggressiveAttempt.result, ParseConfidence.MEDIUM, 'aggressive', attempts);
     }
 
     // STAGE 5: Partial extraction (if enabled)
     if (this.config.fallbackToPartial) {
+      stageStart = Date.now();
       const partialAttempt = this.attemptPartialExtraction(rawResponse);
       attempts.push(partialAttempt);
+      console.log(`[PARSER:${providerName.toUpperCase()}] ⏱️  Stage 5 (partial): ${Date.now() - stageStart}ms`);
       if (partialAttempt.success) {
-        console.warn(`[PARSER:${providerName.toUpperCase()}] ⚠️  PARTIAL SUCCESS via extraction`);
+        const totalTime = Date.now() - parseStartTime;
+        console.warn(`[PARSER:${providerName.toUpperCase()}] ⚠️  PARTIAL SUCCESS via extraction (${totalTime}ms total)`);
         return this.finalizeResponse(partialAttempt.result, ParseConfidence.LOW, 'partial', attempts);
       }
     }
 
     // STAGE 6: All parsing failed - return structured error
-    console.error(`[PARSER:${providerName.toUpperCase()}] ❌ All parsing strategies failed`);
+    const totalTime = Date.now() - parseStartTime;
+    console.error(`[PARSER:${providerName.toUpperCase()}] ❌ All parsing strategies failed (${totalTime}ms wasted)`);
     return this.createErrorResponse('PARSE_FAILED', 'Could not parse AI response after multiple attempts', attempts);
   }
 
