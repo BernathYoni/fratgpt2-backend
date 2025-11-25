@@ -58,15 +58,19 @@ enum Plan {
 }
 
 model ChatSession {
-  id        String      @id @default(uuid())
-  userId    String
-  title     String?
-  mode      ChatMode
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id                  String      @id @default(uuid())
+  userId              String
+  title               String?
+  mode                ChatMode
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
 
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages  Message[]
+  // Smart cache for region detection
+  cachedRegionData    Json?       // Cached region detection from first capture
+  skipRegionDetection Boolean     @default(false) // Skip detection on follow-ups
+
+  user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages            Message[]
 
   @@index([userId])
   @@index([createdAt])
@@ -79,17 +83,27 @@ enum ChatMode {
 }
 
 model Message {
-  id            String       @id @default(uuid())
-  chatSessionId String
-  role          MessageRole
-  content       String       @db.Text
-  shortAnswer   String?
-  provider      LLMProvider?
-  metadata      Json?
-  createdAt     DateTime     @default(now())
+  id               String       @id @default(uuid())
+  chatSessionId    String
+  role             MessageRole
+  content          String       @db.Text
+  shortAnswer      String?
+  provider         LLMProvider?
+  metadata         Json?
+  createdAt        DateTime     @default(now())
 
-  chatSession   ChatSession  @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
-  attachments   Attachment[]
+  // Structured answer fields
+  questionType     String?      // 'multiple-choice', 'fill-in-blank', etc.
+  answerFormat     String?      // 'single-letter', 'number', 'text'
+  structuredAnswer Json?        // Type-specific answer object
+  confidence       Float?       // 0.0-1.0
+
+  // Region detection
+  questionRegions  Json?        // Bounding boxes from vision analysis
+  selectedRegionId Int?         // Which question user chose (1, 2, 3...)
+
+  chatSession      ChatSession  @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+  attachments      Attachment[]
 
   @@index([chatSessionId])
   @@index([createdAt])
@@ -109,17 +123,21 @@ enum LLMProvider {
 }
 
 model Attachment {
-  id         String         @id @default(uuid())
-  messageId  String
-  type       AttachmentType
-  source     CaptureSource
-  storageUrl String?
-  imageData  String?        @db.Text
-  width      Int?
-  height     Int?
-  createdAt  DateTime       @default(now())
+  id               String         @id @default(uuid())
+  messageId        String
+  type             AttachmentType
+  source           CaptureSource
+  storageUrl       String?
+  imageData        String?        @db.Text
+  width            Int?
+  height           Int?
+  createdAt        DateTime       @default(now())
 
-  message    Message        @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  // Region detection metadata
+  detectedPlatform String?        // 'pearson', 'khan', 'mcgraw', etc.
+  regionData       Json?          // Full region detection response
+
+  message          Message        @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   @@index([messageId])
   @@index([createdAt])

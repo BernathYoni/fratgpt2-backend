@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { LLMProvider, LLMMessage, LLMResponse, LLMOptions } from './types';
 import { ExpertParser } from './parser';
+import { AnswerFormatter } from './answerFormatter';
 
 const SYSTEM_PROMPT = `You are a professional homework assistant that provides clear, accurate, and helpful explanations.
 
@@ -65,8 +66,9 @@ export class GeminiProvider implements LLMProvider {
     // Build the prompt
     const parts: any[] = [];
 
-    // Add system prompt
-    parts.push({ text: options?.systemPrompt || SYSTEM_PROMPT });
+    // Add system prompt with structured answer requirements
+    const systemPrompt = (options?.systemPrompt || SYSTEM_PROMPT) + AnswerFormatter.buildStructuredAnswerPrompt();
+    parts.push({ text: systemPrompt });
 
     // Add conversation history
     for (const msg of messages) {

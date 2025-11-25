@@ -6,8 +6,11 @@ import { UsageService } from '../services/usage';
 import { LLMOrchestrator } from '../services/llm/orchestrator';
 import { LLMMessage } from '../services/llm/types';
 import { ChatMode } from '@prisma/client';
+import { RegionDetectionService } from '../services/vision/regionService';
+import { AnswerFormatter } from '../services/llm/answerFormatter';
 
 const orchestrator = new LLMOrchestrator();
+const regionService = new RegionDetectionService(process.env.GEMINI_API_KEY || '');
 
 const startChatSchema = z.object({
   mode: z.enum(['REGULAR', 'FAST', 'EXPERT']),
@@ -80,6 +83,40 @@ export async function chatRoutes(server: FastifyInstance) {
       });
       console.log('[CHAT/START] ✅ User message created, ID:', userMessage.id);
 
+      // REGION DETECTION (Smart Cache - only on first capture with image)
+      let regionData = null;
+      let detectedPlatform = null;
+      if (RegionDetectionService.shouldDetectRegions(imageData, true)) {
+        console.log('[CHAT/START] 🔍 Running region detection (first capture)...');
+        const regionStartTime = Date.now();
+        try {
+          const { regionData: detected, fromCache } = await regionService.detectOrUseCache(
+            session.id,
+            imageData!,
+            false // Don't force, use cache if available
+          );
+          regionData = detected;
+          detectedPlatform = detected.platform;
+          const regionDuration = Date.now() - regionStartTime;
+          console.log(`[CHAT/START] ✅ Region detection complete (${regionDuration}ms, fromCache: ${fromCache})`);
+          console.log(`[CHAT/START] 📊 Found ${detected.questionCount} question(s) on ${detected.platform} platform`);
+
+          // Update attachment with region data
+          if (userMessage.attachments[0]) {
+            await prisma.attachment.update({
+              where: { id: userMessage.attachments[0].id },
+              data: {
+                detectedPlatform,
+                regionData: regionData as any,
+              },
+            });
+          }
+        } catch (error: any) {
+          console.error('[CHAT/START] ⚠️  Region detection failed, continuing without it:', error.message);
+          // Don't fail the whole request if region detection fails
+        }
+      }
+
       // Build LLM messages
       console.log('[CHAT/START] 🤖 Building LLM message array...');
       const llmMessages: LLMMessage[] = [
@@ -98,10 +135,29 @@ export async function chatRoutes(server: FastifyInstance) {
       const duration = Date.now() - startTime;
       console.log('[CHAT/START] ✅ LLM response received in', duration, 'ms');
 
-      // Save assistant message(s)
+      // Save assistant message(s) with structured answer data
       if (mode === 'EXPERT' && result.providers) {
         // Save all provider responses (no consensus)
         for (const provider of result.providers) {
+          // Try to extract structured answer from response
+          let structuredAnswer = null;
+          let questionType = null;
+          let answerFormat = null;
+          let confidence = provider.response.confidence || null;
+
+          try {
+            // Parse the response to check if it has structured answer
+            const parsed = JSON.parse(provider.response.shortAnswer);
+            if (parsed.questionType && parsed.answer) {
+              structuredAnswer = parsed;
+              questionType = parsed.questionType;
+              answerFormat = parsed.expectedFormat;
+              confidence = parsed.confidence || confidence;
+            }
+          } catch {
+            // Not structured JSON, use legacy format
+          }
+
           await prisma.message.create({
             data: {
               chatSessionId: session.id,
@@ -110,11 +166,34 @@ export async function chatRoutes(server: FastifyInstance) {
               shortAnswer: provider.response.shortAnswer,
               provider: provider.provider.toUpperCase() as any,
               metadata: provider.error ? { error: provider.error } : undefined,
+              questionType,
+              answerFormat,
+              structuredAnswer: structuredAnswer as any,
+              confidence,
+              questionRegions: regionData as any,
             },
           });
         }
       } else {
-        // Save single response
+        // Save single response with structured answer
+        let structuredAnswer = null;
+        let questionType = null;
+        let answerFormat = null;
+        let confidence = result.primary.confidence || null;
+
+        try {
+          // Parse the response to check if it has structured answer
+          const parsed = JSON.parse(result.primary.shortAnswer);
+          if (parsed.questionType && parsed.answer) {
+            structuredAnswer = parsed;
+            questionType = parsed.questionType;
+            answerFormat = parsed.expectedFormat;
+            confidence = parsed.confidence || confidence;
+          }
+        } catch {
+          // Not structured JSON, use legacy format
+        }
+
         await prisma.message.create({
           data: {
             chatSessionId: session.id,
@@ -122,6 +201,11 @@ export async function chatRoutes(server: FastifyInstance) {
             content: JSON.stringify({ steps: result.primary.steps }),
             shortAnswer: result.primary.shortAnswer,
             provider: mode === 'FAST' ? 'GEMINI' : 'GEMINI',
+            questionType,
+            answerFormat,
+            structuredAnswer: structuredAnswer as any,
+            confidence,
+            questionRegions: regionData as any,
           },
         });
       }
@@ -203,7 +287,7 @@ export async function chatRoutes(server: FastifyInstance) {
       console.log('[CHAT/MESSAGE] 📊 Rate limiting disabled for testing');
 
       // Create user message
-      await prisma.message.create({
+      const userMessage = await prisma.message.create({
         data: {
           chatSessionId: session.id,
           role: 'USER',
@@ -218,7 +302,44 @@ export async function chatRoutes(server: FastifyInstance) {
               }
             : undefined,
         },
+        include: {
+          attachments: true,
+        },
       });
+
+      // REGION DETECTION (Smart Cache - uses cache if available, only runs on new captures)
+      let regionData = null;
+      let detectedPlatform = null;
+      const isNewCapture = !!imageData;
+      if (RegionDetectionService.shouldDetectRegions(imageData, isNewCapture)) {
+        console.log('[CHAT/MESSAGE] 🔍 Checking region detection cache...');
+        const regionStartTime = Date.now();
+        try {
+          const { regionData: detected, fromCache } = await regionService.detectOrUseCache(
+            session.id,
+            imageData!,
+            false // Use cache if available
+          );
+          regionData = detected;
+          detectedPlatform = detected.platform;
+          const regionDuration = Date.now() - regionStartTime;
+          console.log(`[CHAT/MESSAGE] ✅ Region detection ${fromCache ? 'from CACHE' : 'NEW'} (${regionDuration}ms)`);
+          console.log(`[CHAT/MESSAGE] 📊 Found ${detected.questionCount} question(s) on ${detected.platform} platform`);
+
+          // Update attachment with region data
+          if (userMessage.attachments[0]) {
+            await prisma.attachment.update({
+              where: { id: userMessage.attachments[0].id },
+              data: {
+                detectedPlatform,
+                regionData: regionData as any,
+              },
+            });
+          }
+        } catch (error: any) {
+          console.error('[CHAT/MESSAGE] ⚠️  Region detection failed, continuing without it:', error.message);
+        }
+      }
 
       // Build conversation history for LLM
       // IMPORTANT: Don't include images from previous messages to avoid token overflow
@@ -241,10 +362,28 @@ export async function chatRoutes(server: FastifyInstance) {
       // Generate response using effective mode
       const result = await orchestrator.generate(effectiveMode as ChatMode, llmMessages);
 
-      // Save response(s)
+      // Save response(s) with structured answer data
       if (effectiveMode === 'EXPERT' && result.providers) {
         // Save all provider responses (no consensus)
         for (const provider of result.providers) {
+          // Try to extract structured answer from response
+          let structuredAnswer = null;
+          let questionType = null;
+          let answerFormat = null;
+          let confidence = provider.response.confidence || null;
+
+          try {
+            const parsed = JSON.parse(provider.response.shortAnswer);
+            if (parsed.questionType && parsed.answer) {
+              structuredAnswer = parsed;
+              questionType = parsed.questionType;
+              answerFormat = parsed.expectedFormat;
+              confidence = parsed.confidence || confidence;
+            }
+          } catch {
+            // Not structured JSON, use legacy format
+          }
+
           await prisma.message.create({
             data: {
               chatSessionId: session.id,
@@ -253,10 +392,33 @@ export async function chatRoutes(server: FastifyInstance) {
               shortAnswer: provider.response.shortAnswer,
               provider: provider.provider.toUpperCase() as any,
               metadata: provider.error ? { error: provider.error } : undefined,
+              questionType,
+              answerFormat,
+              structuredAnswer: structuredAnswer as any,
+              confidence,
+              questionRegions: regionData as any,
             },
           });
         }
       } else {
+        // Save single response with structured answer
+        let structuredAnswer = null;
+        let questionType = null;
+        let answerFormat = null;
+        let confidence = result.primary.confidence || null;
+
+        try {
+          const parsed = JSON.parse(result.primary.shortAnswer);
+          if (parsed.questionType && parsed.answer) {
+            structuredAnswer = parsed;
+            questionType = parsed.questionType;
+            answerFormat = parsed.expectedFormat;
+            confidence = parsed.confidence || confidence;
+          }
+        } catch {
+          // Not structured JSON, use legacy format
+        }
+
         await prisma.message.create({
           data: {
             chatSessionId: session.id,
@@ -264,6 +426,11 @@ export async function chatRoutes(server: FastifyInstance) {
             content: JSON.stringify({ steps: result.primary.steps }),
             shortAnswer: result.primary.shortAnswer,
             provider: 'GEMINI',
+            questionType,
+            answerFormat,
+            structuredAnswer: structuredAnswer as any,
+            confidence,
+            questionRegions: regionData as any,
           },
         });
       }

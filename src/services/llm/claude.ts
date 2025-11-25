@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { LLMProvider, LLMMessage, LLMResponse, LLMOptions } from './types';
 import { ExpertParser } from './parser';
+import { AnswerFormatter } from './answerFormatter';
 
 const SYSTEM_PROMPT = `You are a professional homework assistant that provides clear, accurate, and helpful explanations.
 
@@ -95,11 +96,12 @@ export class ClaudeProvider implements LLMProvider {
       }
 
       console.log('[CLAUDE] 📤 Sending request to Anthropic API...');
+      const systemPrompt = (options?.systemPrompt || SYSTEM_PROMPT) + AnswerFormatter.buildStructuredAnswerPrompt();
       const response = await this.client.messages.create({
         model,
         max_tokens: options?.maxTokens || 2048,
         temperature: options?.temperature || 0.7,
-        system: options?.systemPrompt || SYSTEM_PROMPT,
+        system: systemPrompt,
         messages: claudeMessages,
       });
 

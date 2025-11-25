@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { LLMProvider, LLMMessage, LLMResponse, LLMOptions } from './types';
 import { ExpertParser } from './parser';
+import { AnswerFormatter } from './answerFormatter';
 
 const SYSTEM_PROMPT = `You are a professional homework assistant that provides clear, accurate, and helpful explanations.
 
@@ -60,9 +61,10 @@ export class OpenAIProvider implements LLMProvider {
       maxTokens: options?.maxTokens || 2048,
     });
 
-    // Build messages array
+    // Build messages array with structured answer requirements
+    const systemPrompt = (options?.systemPrompt || SYSTEM_PROMPT) + AnswerFormatter.buildStructuredAnswerPrompt();
     const openaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-      { role: 'system', content: options?.systemPrompt || SYSTEM_PROMPT },
+      { role: 'system', content: systemPrompt },
     ];
 
     for (const msg of messages) {
