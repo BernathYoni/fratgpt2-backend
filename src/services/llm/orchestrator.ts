@@ -104,11 +104,16 @@ export class LLMOrchestrator {
     console.log('[EXPERT] 🚀 Starting Expert mode generation');
     console.log('[EXPERT] 📤 Calling all 3 providers in parallel...');
 
-    // Call all providers in parallel
+    // Call all providers in parallel with increased token limits to handle thinking tokens
+    const expertOptions = {
+      maxTokens: 8192,
+      temperature: 0.7,
+    };
+
     const results = await Promise.allSettled([
-      this.gemini.generate(messages).then(r => ({ provider: 'gemini', response: r })),
-      this.openai.generate(messages).then(r => ({ provider: 'openai', response: r })),
-      this.claude.generate(messages).then(r => ({ provider: 'claude', response: r })),
+      this.gemini.generate(messages, expertOptions).then(r => ({ provider: 'gemini', response: r })),
+      this.openai.generate(messages, expertOptions).then(r => ({ provider: 'openai', response: r })),
+      this.claude.generate(messages, expertOptions).then(r => ({ provider: 'claude', response: r })),
     ]);
 
     console.log('[EXPERT] 📊 All provider calls completed');
