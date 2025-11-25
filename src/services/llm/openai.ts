@@ -118,9 +118,26 @@ export class OpenAIProvider implements LLMProvider {
       console.error('[OPENAI] ⚠️  This may indicate content was filtered or generation failed');
     }
 
+    console.log('[OPENAI] 🔍 CRITICAL: Extracting text from completion...');
+    console.log('[OPENAI] 🔍 choices array exists:', !!completion.choices);
+    console.log('[OPENAI] 🔍 choices[0] exists:', !!completion.choices[0]);
+    console.log('[OPENAI] 🔍 choices[0].message exists:', !!completion.choices[0]?.message);
+    console.log('[OPENAI] 🔍 choices[0].message.content exists:', completion.choices[0]?.message?.content !== undefined);
+
     const text = completion.choices[0]?.message?.content || '';
 
-    console.log('[OPENAI] 📝 RAW RESPONSE:');
+    console.log('[OPENAI] 🔍 text variable type:', typeof text);
+    console.log('[OPENAI] 🔍 text length:', text?.length ?? 'N/A');
+    console.log('[OPENAI] 🔍 text is null:', text === null);
+    console.log('[OPENAI] 🔍 text is undefined:', text === undefined);
+    console.log('[OPENAI] 🔍 text is empty string:', text === '');
+
+    if (!text || text.trim().length === 0) {
+      console.error('[OPENAI] ❌❌❌ EMPTY TEXT EXTRACTED ❌❌❌');
+      console.error('[OPENAI] completion.choices[0]:', JSON.stringify(completion.choices[0], null, 2));
+    }
+
+    console.log('[OPENAI] 📝 RAW RESPONSE TEXT:');
     console.log('[OPENAI] ═══════════════════════════════════════════════════════════');
     console.log(text);
     console.log('[OPENAI] ═══════════════════════════════════════════════════════════');

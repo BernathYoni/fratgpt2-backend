@@ -121,12 +121,30 @@ export class ClaudeProvider implements LLMProvider {
         console.error('[CLAUDE] ⚠️  This may indicate content was filtered or max tokens reached');
       }
 
-      const text = response.content
-        .filter((block: any) => block.type === 'text')
+      console.log('[CLAUDE] 🔍 CRITICAL: Extracting text from content blocks...');
+      console.log('[CLAUDE] 🔍 response.content exists:', !!response.content);
+      console.log('[CLAUDE] 🔍 response.content is array:', Array.isArray(response.content));
+      console.log('[CLAUDE] 🔍 content blocks count:', response.content?.length ?? 0);
+
+      const textBlocks = response.content.filter((block: any) => block.type === 'text');
+      console.log('[CLAUDE] 🔍 text blocks count:', textBlocks.length);
+
+      const text = textBlocks
         .map((block: any) => block.text)
         .join('\n');
 
-      console.log('[CLAUDE] 📝 RAW RESPONSE:');
+      console.log('[CLAUDE] 🔍 text variable type:', typeof text);
+      console.log('[CLAUDE] 🔍 text length:', text?.length ?? 'N/A');
+      console.log('[CLAUDE] 🔍 text is null:', text === null);
+      console.log('[CLAUDE] 🔍 text is undefined:', text === undefined);
+      console.log('[CLAUDE] 🔍 text is empty string:', text === '');
+
+      if (!text || text.trim().length === 0) {
+        console.error('[CLAUDE] ❌❌❌ EMPTY TEXT EXTRACTED ❌❌❌');
+        console.error('[CLAUDE] response.content:', JSON.stringify(response.content, null, 2));
+      }
+
+      console.log('[CLAUDE] 📝 RAW RESPONSE TEXT:');
       console.log('[CLAUDE] ═══════════════════════════════════════════════════════════');
       console.log(text);
       console.log('[CLAUDE] ═══════════════════════════════════════════════════════════');

@@ -119,9 +119,29 @@ export class GeminiProvider implements LLMProvider {
       }
     }
 
-    const text = response.text();
+    console.log('[GEMINI] 🔍 CRITICAL: About to call response.text()...');
+    console.log('[GEMINI] 🔍 response object exists:', !!response);
+    console.log('[GEMINI] 🔍 response.text is function:', typeof response.text === 'function');
 
-    console.log('[GEMINI] 📝 RAW RESPONSE:');
+    let text;
+    try {
+      text = response.text();
+      console.log('[GEMINI] ✅ response.text() succeeded');
+    } catch (error: any) {
+      console.error('[GEMINI] ❌❌❌ CRITICAL ERROR: response.text() FAILED ❌❌❌');
+      console.error('[GEMINI] Error:', error.message);
+      console.error('[GEMINI] Error stack:', error.stack);
+      console.error('[GEMINI] Response object:', JSON.stringify(response, null, 2));
+      throw error;
+    }
+
+    console.log('[GEMINI] 🔍 text variable type:', typeof text);
+    console.log('[GEMINI] 🔍 text length:', text?.length ?? 'N/A');
+    console.log('[GEMINI] 🔍 text is null:', text === null);
+    console.log('[GEMINI] 🔍 text is undefined:', text === undefined);
+    console.log('[GEMINI] 🔍 text is empty string:', text === '');
+
+    console.log('[GEMINI] 📝 RAW RESPONSE TEXT:');
     console.log('[GEMINI] ═══════════════════════════════════════════════════════════');
     console.log(text);
     console.log('[GEMINI] ═══════════════════════════════════════════════════════════');
