@@ -46,13 +46,6 @@ export async function chatRoutes(server: FastifyInstance) {
       console.log('[CHAT/START] Image size:', imageData ? `${(imageData.length / 1024).toFixed(2)} KB` : 'N/A');
       console.log('[CHAT/START] Capture source:', captureSource);
 
-      // Log full base64 image for debugging (can be pasted into Claude for visual analysis)
-      if (imageData) {
-        console.log('[CHAT/START] 🖼️  ========== IMAGE_BASE64_START ==========');
-        console.log(imageData);
-        console.log('[CHAT/START] 🖼️  ========== IMAGE_BASE64_END ==========');
-      }
-
       // Rate limiting disabled for testing
       console.log('[CHAT/START] 📊 Rate limiting disabled for testing');
 
@@ -255,13 +248,6 @@ export async function chatRoutes(server: FastifyInstance) {
       const { userId } = await authenticate(request);
       const { sessionId } = request.params as { sessionId: string };
       const { message, imageData, captureSource, mode } = sendMessageSchema.parse(request.body);
-
-      // Log full base64 image for debugging (can be pasted into Claude for visual analysis)
-      if (imageData) {
-        console.log('[CHAT/MESSAGE] 🖼️  ========== IMAGE_BASE64_START ==========');
-        console.log(imageData);
-        console.log('[CHAT/MESSAGE] 🖼️  ========== IMAGE_BASE64_END ==========');
-      }
 
       // Get session
       const session = await prisma.chatSession.findUnique({
