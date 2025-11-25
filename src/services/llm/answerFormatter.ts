@@ -17,7 +17,7 @@ export class AnswerFormatter {
 You MUST respond with EXACTLY this JSON structure (no markdown, no code blocks, no explanations):
 
 {
-  "shortAnswer": "<concise answer for display>",
+  "shortAnswer": "<concise answer for display - see shortAnswer rules below>",
   "steps": [
     "Step 1: ...",
     "Step 2: ...",
@@ -28,6 +28,13 @@ You MUST respond with EXACTLY this JSON structure (no markdown, no code blocks, 
   "answer": <see type-specific formats below>,
   "confidence": <0.0-1.0>
 }
+
+**shortAnswer RULES (what to put in the shortAnswer field):**
+- Multiple choice: Just the letter (e.g., "B")
+- Fill-in-blank: ALL blank values separated by commas (e.g., "mitochondria, ATP, glucose")
+- Numeric: The number with unit if applicable (e.g., "3.74 meters" or "42")
+- True/False: "True" or "False"
+- Free response: First 100 characters of the answer
 
 **TYPE-SPECIFIC ANSWER FORMATS:**
 
