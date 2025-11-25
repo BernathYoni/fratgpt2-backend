@@ -221,19 +221,21 @@ export async function chatRoutes(server: FastifyInstance) {
       });
 
       // Build conversation history for LLM
+      // IMPORTANT: Don't include images from previous messages to avoid token overflow
+      // Images can be 500-1000 tokens each, so we only send the NEW image if provided
       const llmMessages: LLMMessage[] = session.messages
         .filter(m => m.provider !== 'GEMINI' && m.provider !== 'OPENAI' && m.provider !== 'CLAUDE')
         .map(m => ({
           role: m.role === 'USER' ? 'user' : 'assistant',
           content: m.content,
-          imageData: m.attachments[0]?.imageData || undefined,
+          // imageData: REMOVED - don't send old images in conversation history
         }));
 
-      // Add new message
+      // Add new message (with imageData if provided)
       llmMessages.push({
         role: 'user',
         content: message,
-        imageData,
+        imageData, // Only send NEW image if user uploaded one
       });
 
       // Generate response using effective mode
