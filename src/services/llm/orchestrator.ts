@@ -73,6 +73,7 @@ export class LLMOrchestrator {
       const response = await this.gemini.generate(messages, {
         maxTokens: 4096, // Increased from 1024 to allow for longer responses
         temperature: 0.5,
+        mode: 'FAST', // Ensure Flash model is used
       });
       const duration = Date.now() - startTime;
       console.log(`[FAST] [${new Date().toISOString()}] ✅ Gemini responded successfully in ${duration}ms`);
@@ -93,6 +94,7 @@ export class LLMOrchestrator {
       const response = await this.gemini.generate(messages, {
         maxTokens: 8192, // Increased from 2048 to account for thinking tokens (2047) + actual response
         temperature: 0.7,
+        mode: 'REGULAR', // Use Pro model
       });
       const duration = Date.now() - startTime;
       console.log(`[REGULAR] [${new Date().toISOString()}] ✅ Gemini responded successfully in ${duration}ms`);
@@ -117,6 +119,7 @@ export class LLMOrchestrator {
       maxTokens: 8192,
       temperature: 0.7,
       requestId, // Pass request ID to providers
+      mode: 'EXPERT' as const, // Use Pro models for expert mode
     };
 
     const parallelStart = Date.now();

@@ -52,7 +52,8 @@ export class GeminiProvider implements LLMProvider {
   async generate(messages: LLMMessage[], options?: LLMOptions): Promise<LLMResponse> {
     const startTime = Date.now();
     const requestId = options?.requestId || 'SINGLE';
-    const modelName = options?.maxTokens && options.maxTokens < 2000
+    // Select model based on mode: FAST uses Flash, others use Pro
+    const modelName = options?.mode === 'FAST'
       ? 'gemini-2.0-flash-001'
       : 'gemini-2.5-pro';
 

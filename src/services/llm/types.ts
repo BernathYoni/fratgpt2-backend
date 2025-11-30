@@ -46,6 +46,7 @@ export interface LLMOptions {
   maxTokens?: number;
   systemPrompt?: string;
   requestId?: string; // For tracking parallel requests in EXPERT mode
+  mode?: 'FAST' | 'REGULAR' | 'EXPERT'; // To help providers select the right model
 }
 
 // Parser configuration
