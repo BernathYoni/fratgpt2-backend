@@ -50,17 +50,19 @@ export class ClaudeProvider implements LLMProvider {
   }
 
   async generate(messages: LLMMessage[], options?: LLMOptions): Promise<LLMResponse> {
+    const startTime = Date.now();
+    const requestId = options?.requestId || 'SINGLE';
     const model = options?.maxTokens && options.maxTokens < 2000
       ? 'claude-haiku-4-5-20251001'
       : 'claude-sonnet-4-5-20250929';
 
-    console.log('[CLAUDE] 🚀 Starting generation');
-    console.log('[CLAUDE] 📊 Model:', model);
-    console.log('[CLAUDE] ⚙️  Config:', {
+    console.log(`[CLAUDE] [${new Date().toISOString()}] [${requestId}] 🚀 Starting generation`);
+    console.log(`[CLAUDE] [${requestId}] 📊 Model:`, model);
+    console.log(`[CLAUDE] [${requestId}] ⚙️  Config:`, {
       temperature: options?.temperature || 0.7,
       maxTokens: options?.maxTokens || 2048,
     });
-    console.log('[CLAUDE] 📨 Messages count:', messages.length);
+    console.log(`[CLAUDE] [${requestId}] 📨 Messages count:`, messages.length);
 
     try {
 
@@ -72,7 +74,7 @@ export class ClaudeProvider implements LLMProvider {
 
         if (msg.imageData) {
           const imageSize = msg.imageData.length;
-          console.log('[CLAUDE] 🖼️  Image detected, size:', (imageSize / 1024).toFixed(2), 'KB');
+          console.log(`[CLAUDE] [${requestId}] 🖼️  Image detected, size:`, (imageSize / 1024).toFixed(2), 'KB');
 
           content.push({
             type: 'image',
@@ -95,7 +97,8 @@ export class ClaudeProvider implements LLMProvider {
         });
       }
 
-      console.log('[CLAUDE] 📤 Sending request to Anthropic API...');
+      const apiStart = Date.now();
+      console.log(`[CLAUDE] [${new Date().toISOString()}] [${requestId}] 📤 Sending request to Anthropic API...`);
       const systemPrompt = (options?.systemPrompt || SYSTEM_PROMPT) + AnswerFormatter.buildStructuredAnswerPrompt();
       const response = await this.client.messages.create({
         model,
@@ -104,8 +107,9 @@ export class ClaudeProvider implements LLMProvider {
         system: systemPrompt,
         messages: claudeMessages,
       });
+      const apiDuration = Date.now() - apiStart;
 
-      console.log('[CLAUDE] 📥 Received response from Anthropic API');
+      console.log(`[CLAUDE] [${new Date().toISOString()}] [${requestId}] 📥 Received response from Anthropic API in ${apiDuration}ms`);
       console.log('[CLAUDE] 🔍 FULL API RESPONSE OBJECT:');
       console.log('[CLAUDE] ═══════════════════════════════════════════════════════════');
       console.log(JSON.stringify(response, null, 2));
@@ -150,6 +154,8 @@ export class ClaudeProvider implements LLMProvider {
       console.log('[CLAUDE] ═══════════════════════════════════════════════════════════');
 
       // Use ExpertParser for robust multi-stage parsing
+      const parseStart = Date.now();
+      console.log(`[CLAUDE] [${new Date().toISOString()}] [${requestId}] 🔍 Starting response parsing...`);
       const parser = new ExpertParser({
         enableSelfHealing: false,
         fallbackToPartial: true,
@@ -158,6 +164,8 @@ export class ClaudeProvider implements LLMProvider {
       });
 
       const parsed = await parser.parse(text, 'claude');
+      const parseDuration = Date.now() - parseStart;
+      console.log(`[CLAUDE] [${new Date().toISOString()}] [${requestId}] ✅ Parsing complete in ${parseDuration}ms`);
 
       // Add token usage
       parsed.tokensUsed = response.usage.input_tokens + response.usage.output_tokens;
@@ -179,9 +187,12 @@ export class ClaudeProvider implements LLMProvider {
         })));
       }
 
+      const totalDuration = Date.now() - startTime;
+      console.log(`[CLAUDE] [${new Date().toISOString()}] [${requestId}] ✅ Total generation time: ${totalDuration}ms (API: ${apiDuration}ms, Parse: ${parseDuration}ms)`);
+
       return parsed;
     } catch (error: any) {
-      console.error('[CLAUDE] ❌ ERROR in generate:');
+      console.error(`[CLAUDE] [${new Date().toISOString()}] ❌ ERROR in generate:`);
       console.error('[CLAUDE] ❌ Error name:', error?.name);
       console.error('[CLAUDE] ❌ Error message:', error?.message);
       console.error('[CLAUDE] ❌ Error status:', error?.status);

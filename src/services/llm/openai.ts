@@ -50,13 +50,15 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   async generate(messages: LLMMessage[], options?: LLMOptions): Promise<LLMResponse> {
+    const startTime = Date.now();
+    const requestId = options?.requestId || 'SINGLE';
     const model = options?.maxTokens && options.maxTokens < 2000
       ? 'gpt-4o-mini'
       : 'gpt-4o';
 
-    console.log('[OPENAI] 🚀 Starting generation');
-    console.log('[OPENAI] 📊 Model:', model);
-    console.log('[OPENAI] ⚙️  Config:', {
+    console.log(`[OPENAI] [${new Date().toISOString()}] [${requestId}] 🚀 Starting generation`);
+    console.log(`[OPENAI] [${requestId}] 📊 Model:`, model);
+    console.log(`[OPENAI] [${requestId}] ⚙️  Config:`, {
       temperature: options?.temperature || 0.7,
       maxTokens: options?.maxTokens || 2048,
     });
@@ -70,7 +72,7 @@ export class OpenAIProvider implements LLMProvider {
     for (const msg of messages) {
       if (msg.imageData && msg.role === 'user') {
         const imageSize = msg.imageData.length;
-        console.log('[OPENAI] 🖼️  Image detected, size:', (imageSize / 1024).toFixed(2), 'KB');
+        console.log(`[OPENAI] [${requestId}] 🖼️  Image detected, size:`, (imageSize / 1024).toFixed(2), 'KB');
 
         openaiMessages.push({
           role: 'user',
@@ -94,7 +96,8 @@ export class OpenAIProvider implements LLMProvider {
       }
     }
 
-    console.log('[OPENAI] 📤 Sending request to OpenAI API...');
+    const apiStart = Date.now();
+    console.log(`[OPENAI] [${new Date().toISOString()}] [${requestId}] 📤 Sending request to OpenAI API...`);
     const completion = await this.client.chat.completions.create({
       model,
       messages: openaiMessages,
@@ -102,8 +105,9 @@ export class OpenAIProvider implements LLMProvider {
       max_tokens: options?.maxTokens || 2048,
       response_format: { type: 'json_object' },
     });
+    const apiDuration = Date.now() - apiStart;
 
-    console.log('[OPENAI] 📥 Received response from OpenAI API');
+    console.log(`[OPENAI] [${new Date().toISOString()}] [${requestId}] 📥 Received response from OpenAI API in ${apiDuration}ms`);
     console.log('[OPENAI] 🔍 FULL API RESPONSE OBJECT:');
     console.log('[OPENAI] ═══════════════════════════════════════════════════════════');
     console.log(JSON.stringify(completion, null, 2));
@@ -143,6 +147,8 @@ export class OpenAIProvider implements LLMProvider {
     console.log('[OPENAI] ═══════════════════════════════════════════════════════════');
 
     // Use ExpertParser for robust multi-stage parsing
+    const parseStart = Date.now();
+    console.log(`[OPENAI] [${new Date().toISOString()}] [${requestId}] 🔍 Starting response parsing...`);
     const parser = new ExpertParser({
       enableSelfHealing: false,
       fallbackToPartial: true,
@@ -151,6 +157,8 @@ export class OpenAIProvider implements LLMProvider {
     });
 
     const parsed = await parser.parse(text, 'openai');
+    const parseDuration = Date.now() - parseStart;
+    console.log(`[OPENAI] [${new Date().toISOString()}] [${requestId}] ✅ Parsing complete in ${parseDuration}ms`);
 
     // Add token usage
     parsed.tokensUsed = completion.usage?.total_tokens;
@@ -171,6 +179,9 @@ export class OpenAIProvider implements LLMProvider {
         error: a.error,
       })));
     }
+
+    const totalDuration = Date.now() - startTime;
+    console.log(`[OPENAI] [${new Date().toISOString()}] [${requestId}] ✅ Total generation time: ${totalDuration}ms (API: ${apiDuration}ms, Parse: ${parseDuration}ms)`);
 
     return parsed;
   }

@@ -28,7 +28,8 @@ export class LLMOrchestrator {
     primary: LLMResponse;
     providers?: ProviderResult[];
   }> {
-    console.log('[ORCHESTRATOR] 🤖 generate() called');
+    const startTime = Date.now();
+    console.log(`[ORCHESTRATOR] [${new Date().toISOString()}] 🤖 generate() called`);
     console.log('[ORCHESTRATOR] Mode:', mode);
     console.log('[ORCHESTRATOR] Messages count:', messages.length);
     console.log('[ORCHESTRATOR] Has image:', messages.some(m => !!m.imageData));
@@ -37,21 +38,22 @@ export class LLMOrchestrator {
       let result;
       switch (mode) {
         case 'FAST':
-          console.log('[ORCHESTRATOR] → Routing to generateFast()');
+          console.log(`[ORCHESTRATOR] [${new Date().toISOString()}] → Routing to generateFast()`);
           result = await this.generateFast(messages);
           break;
         case 'REGULAR':
-          console.log('[ORCHESTRATOR] → Routing to generateRegular()');
+          console.log(`[ORCHESTRATOR] [${new Date().toISOString()}] → Routing to generateRegular()`);
           result = await this.generateRegular(messages);
           break;
         case 'EXPERT':
-          console.log('[ORCHESTRATOR] → Routing to generateExpert()');
+          console.log(`[ORCHESTRATOR] [${new Date().toISOString()}] → Routing to generateExpert()`);
           result = await this.generateExpert(messages);
           break;
         default:
           throw new Error(`Unknown mode: ${mode}`);
       }
-      console.log('[ORCHESTRATOR] ✅ Generation complete');
+      const duration = Date.now() - startTime;
+      console.log(`[ORCHESTRATOR] [${new Date().toISOString()}] ✅ Generation complete in ${duration}ms`);
       return result;
     } catch (error: any) {
       console.error('[ORCHESTRATOR] ❌ ERROR in generate()');
@@ -65,16 +67,18 @@ export class LLMOrchestrator {
    * Fast mode: Use cheaper/faster model
    */
   private async generateFast(messages: LLMMessage[]) {
-    console.log('[FAST] Calling Gemini with maxTokens=4096, temp=0.5');
+    const startTime = Date.now();
+    console.log(`[FAST] [${new Date().toISOString()}] Calling Gemini with maxTokens=4096, temp=0.5`);
     try {
       const response = await this.gemini.generate(messages, {
         maxTokens: 4096, // Increased from 1024 to allow for longer responses
         temperature: 0.5,
       });
-      console.log('[FAST] ✅ Gemini responded successfully');
+      const duration = Date.now() - startTime;
+      console.log(`[FAST] [${new Date().toISOString()}] ✅ Gemini responded successfully in ${duration}ms`);
       return { primary: response };
     } catch (error: any) {
-      console.error('[FAST] ❌ Gemini error:', error?.message);
+      console.error(`[FAST] [${new Date().toISOString()}] ❌ Gemini error:`, error?.message);
       throw error;
     }
   }
@@ -83,16 +87,18 @@ export class LLMOrchestrator {
    * Regular mode: Use high-quality model
    */
   private async generateRegular(messages: LLMMessage[]) {
-    console.log('[REGULAR] Calling Gemini with maxTokens=8192, temp=0.7');
+    const startTime = Date.now();
+    console.log(`[REGULAR] [${new Date().toISOString()}] Calling Gemini with maxTokens=8192, temp=0.7`);
     try {
       const response = await this.gemini.generate(messages, {
         maxTokens: 8192, // Increased from 2048 to account for thinking tokens (2047) + actual response
         temperature: 0.7,
       });
-      console.log('[REGULAR] ✅ Gemini responded successfully');
+      const duration = Date.now() - startTime;
+      console.log(`[REGULAR] [${new Date().toISOString()}] ✅ Gemini responded successfully in ${duration}ms`);
       return { primary: response };
     } catch (error: any) {
-      console.error('[REGULAR] ❌ Gemini error:', error?.message);
+      console.error(`[REGULAR] [${new Date().toISOString()}] ❌ Gemini error:`, error?.message);
       throw error;
     }
   }
@@ -101,22 +107,43 @@ export class LLMOrchestrator {
    * Expert mode: Call all 3 providers and return their responses
    */
   private async generateExpert(messages: LLMMessage[]) {
-    console.log('[EXPERT] 🚀 Starting Expert mode generation');
-    console.log('[EXPERT] 📤 Calling all 3 providers in parallel...');
+    const startTime = Date.now();
+    const requestId = `EXPERT-${Date.now()}`; // Unique ID for this expert request
+    console.log(`[EXPERT] [${new Date().toISOString()}] [${requestId}] 🚀 Starting Expert mode generation`);
+    console.log(`[EXPERT] [${new Date().toISOString()}] [${requestId}] 📤 Calling all 3 providers in parallel...`);
 
     // Call all providers in parallel with increased token limits to handle thinking tokens
     const expertOptions = {
       maxTokens: 8192,
       temperature: 0.7,
+      requestId, // Pass request ID to providers
     };
 
-    const results = await Promise.allSettled([
-      this.gemini.generate(messages, expertOptions).then(r => ({ provider: 'gemini', response: r })),
-      this.openai.generate(messages, expertOptions).then(r => ({ provider: 'openai', response: r })),
-      this.claude.generate(messages, expertOptions).then(r => ({ provider: 'claude', response: r })),
-    ]);
+    const parallelStart = Date.now();
+    console.log(`[EXPERT] [${new Date().toISOString()}] [${requestId}] ⏱️ GEMINI START at ${Date.now() - parallelStart}ms`);
+    console.log(`[EXPERT] [${new Date().toISOString()}] [${requestId}] ⏱️ OPENAI START at ${Date.now() - parallelStart}ms`);
+    console.log(`[EXPERT] [${new Date().toISOString()}] [${requestId}] ⏱️ CLAUDE START at ${Date.now() - parallelStart}ms`);
 
-    console.log('[EXPERT] 📊 All provider calls completed');
+    const results = await Promise.allSettled([
+      this.gemini.generate(messages, expertOptions).then(r => {
+        const elapsed = Date.now() - parallelStart;
+        console.log(`[EXPERT] [${new Date().toISOString()}] [${requestId}] ⏱️ GEMINI DONE at ${elapsed}ms`);
+        return { provider: 'gemini', response: r };
+      }),
+      this.openai.generate(messages, expertOptions).then(r => {
+        const elapsed = Date.now() - parallelStart;
+        console.log(`[EXPERT] [${new Date().toISOString()}] [${requestId}] ⏱️ OPENAI DONE at ${elapsed}ms`);
+        return { provider: 'openai', response: r };
+      }),
+      this.claude.generate(messages, expertOptions).then(r => {
+        const elapsed = Date.now() - parallelStart;
+        console.log(`[EXPERT] [${new Date().toISOString()}] [${requestId}] ⏱️ CLAUDE DONE at ${elapsed}ms`);
+        return { provider: 'claude', response: r };
+      }),
+    ]);
+    const parallelDuration = Date.now() - parallelStart;
+
+    console.log(`[EXPERT] [${new Date().toISOString()}] 📊 All provider calls completed in ${parallelDuration}ms`);
     console.log('[EXPERT] ═══════════════════════════════════════════════════════════');
 
     const providers: ProviderResult[] = results.map((result, idx) => {
@@ -179,7 +206,8 @@ export class LLMOrchestrator {
     const primaryProvider = sortedProviders.find(p => !p.error && !p.response.error);
     const primary = primaryProvider ? primaryProvider.response : providers[0].response;
 
-    console.log('[EXPERT] ✅ Expert mode complete - returning all provider responses');
+    const totalDuration = Date.now() - startTime;
+    console.log(`[EXPERT] [${new Date().toISOString()}] ✅ Expert mode complete in ${totalDuration}ms - returning all provider responses`);
     console.log(`[EXPERT] Primary provider: ${primaryProvider?.provider ?? 'none'}`);
 
     return {

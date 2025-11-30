@@ -45,6 +45,7 @@ export interface LLMOptions {
   temperature?: number;
   maxTokens?: number;
   systemPrompt?: string;
+  requestId?: string; // For tracking parallel requests in EXPERT mode
 }
 
 // Parser configuration

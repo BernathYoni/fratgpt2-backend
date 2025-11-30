@@ -29,17 +29,20 @@ const sendMessageSchema = z.object({
 export async function chatRoutes(server: FastifyInstance) {
   // POST /chat/start - Start a new chat session
   server.post('/start', async (request, reply) => {
+    const requestStart = Date.now();
     console.log('\n' + '='.repeat(80));
-    console.log('[CHAT/START] 🚀 New chat request received');
-    console.log('[CHAT/START] Time:', new Date().toISOString());
+    console.log(`[CHAT/START] [${new Date().toISOString()}] 🚀 New chat request received`);
 
     try {
-      console.log('[CHAT/START] 🔐 Authenticating...');
+      const authStart = Date.now();
+      console.log(`[CHAT/START] [${new Date().toISOString()}] 🔐 Authenticating...`);
       const { userId } = await authenticate(request);
-      console.log('[CHAT/START] ✅ Authenticated, userId:', userId);
+      console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ Authenticated in ${Date.now() - authStart}ms, userId: ${userId}`);
 
-      console.log('[CHAT/START] 📦 Parsing request body...');
+      const parseStart = Date.now();
+      console.log(`[CHAT/START] [${new Date().toISOString()}] 📦 Parsing request body...`);
       const { mode, message, imageData, captureSource } = startChatSchema.parse(request.body);
+      console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ Parsed in ${Date.now() - parseStart}ms`);
       console.log('[CHAT/START] Mode:', mode);
       console.log('[CHAT/START] Message:', message);
       console.log('[CHAT/START] Has image:', !!imageData);
@@ -50,7 +53,8 @@ export async function chatRoutes(server: FastifyInstance) {
       console.log('[CHAT/START] 📊 Rate limiting disabled for testing');
 
       // Create chat session
-      console.log('[CHAT/START] 💾 Creating chat session...');
+      const dbStart = Date.now();
+      console.log(`[CHAT/START] [${new Date().toISOString()}] 💾 Creating chat session...`);
       const session = await prisma.chatSession.create({
         data: {
           userId,
@@ -58,10 +62,11 @@ export async function chatRoutes(server: FastifyInstance) {
           title: message.substring(0, 50),
         },
       });
-      console.log('[CHAT/START] ✅ Session created, ID:', session.id);
+      console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ Session created in ${Date.now() - dbStart}ms, ID: ${session.id}`);
 
       // Create user message
-      console.log('[CHAT/START] 💾 Creating user message...');
+      const msgStart = Date.now();
+      console.log(`[CHAT/START] [${new Date().toISOString()}] 💾 Creating user message...`);
       const userMessage = await prisma.message.create({
         data: {
           chatSessionId: session.id,
@@ -81,12 +86,12 @@ export async function chatRoutes(server: FastifyInstance) {
           attachments: true,
         },
       });
-      console.log('[CHAT/START] ✅ User message created, ID:', userMessage.id);
+      console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ User message created in ${Date.now() - msgStart}ms, ID: ${userMessage.id}`);
 
       // REGION DETECTION (Smart Cache - only on first capture with image)
       let regionData = null;
       if (RegionDetectionService.shouldDetectRegions(imageData, true)) {
-        console.log('[CHAT/START] 🔍 Running region detection (first capture)...');
+        console.log(`[CHAT/START] [${new Date().toISOString()}] 🔍 Running region detection (first capture)...`);
         const regionStartTime = Date.now();
         try {
           const { regionData: detected, fromCache } = await regionService.detectOrUseCache(
@@ -96,26 +101,28 @@ export async function chatRoutes(server: FastifyInstance) {
           );
           regionData = detected;
           const regionDuration = Date.now() - regionStartTime;
-          console.log(`[CHAT/START] ✅ Region detection complete (${regionDuration}ms, fromCache: ${fromCache})`);
+          console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ Region detection complete (${regionDuration}ms, fromCache: ${fromCache})`);
           console.log(`[CHAT/START] 📊 Found ${detected.questionCount} question(s)`);
 
           // Update attachment with region data
           if (userMessage.attachments[0]) {
+            const updateStart = Date.now();
             await prisma.attachment.update({
               where: { id: userMessage.attachments[0].id },
               data: {
                 regionData: regionData as any,
               },
             });
+            console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ Attachment updated in ${Date.now() - updateStart}ms`);
           }
         } catch (error: any) {
-          console.error('[CHAT/START] ⚠️  Region detection failed, continuing without it:', error.message);
+          console.error(`[CHAT/START] [${new Date().toISOString()}] ⚠️  Region detection failed, continuing without it:`, error.message);
           // Don't fail the whole request if region detection fails
         }
       }
 
       // Build LLM messages
-      console.log('[CHAT/START] 🤖 Building LLM message array...');
+      console.log(`[CHAT/START] [${new Date().toISOString()}] 🤖 Building LLM message array...`);
       const llmMessages: LLMMessage[] = [
         {
           role: 'user',
@@ -125,14 +132,16 @@ export async function chatRoutes(server: FastifyInstance) {
       ];
 
       // Generate response
-      console.log('[CHAT/START] 🤖 Calling LLM orchestrator.generate()...');
+      console.log(`[CHAT/START] [${new Date().toISOString()}] 🤖 Calling LLM orchestrator.generate()...`);
       console.log('[CHAT/START] Mode:', mode);
-      const startTime = Date.now();
+      const llmStart = Date.now();
       const result = await orchestrator.generate(mode as ChatMode, llmMessages);
-      const duration = Date.now() - startTime;
-      console.log('[CHAT/START] ✅ LLM response received in', duration, 'ms');
+      const llmDuration = Date.now() - llmStart;
+      console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ LLM response received in ${llmDuration}ms`);
 
       // Save assistant message(s) with structured answer data
+      const saveStart = Date.now();
+      console.log(`[CHAT/START] [${new Date().toISOString()}] 💾 Saving assistant message(s)...`);
       if (mode === 'EXPERT' && result.providers) {
         // Save all provider responses (no consensus)
         for (const provider of result.providers) {
@@ -206,11 +215,14 @@ export async function chatRoutes(server: FastifyInstance) {
           },
         });
       }
+      console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ Assistant message(s) saved in ${Date.now() - saveStart}ms`);
 
       // Usage tracking disabled for testing
       console.log('[CHAT/START] 📊 Usage tracking disabled for testing');
 
       // Return session with messages
+      const fetchStart = Date.now();
+      console.log(`[CHAT/START] [${new Date().toISOString()}] 📥 Fetching full session data...`);
       const fullSession = await prisma.chatSession.findUnique({
         where: { id: session.id },
         include: {
@@ -220,8 +232,10 @@ export async function chatRoutes(server: FastifyInstance) {
           },
         },
       });
+      console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ Session data fetched in ${Date.now() - fetchStart}ms`);
 
-      console.log('[CHAT/START] ✅ SUCCESS - Sending response');
+      const totalDuration = Date.now() - requestStart;
+      console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ SUCCESS - Total request time: ${totalDuration}ms`);
       console.log('='.repeat(80) + '\n');
       return reply.code(201).send(fullSession);
     } catch (error: any) {

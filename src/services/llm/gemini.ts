@@ -50,13 +50,15 @@ export class GeminiProvider implements LLMProvider {
   }
 
   async generate(messages: LLMMessage[], options?: LLMOptions): Promise<LLMResponse> {
+    const startTime = Date.now();
+    const requestId = options?.requestId || 'SINGLE';
     const modelName = options?.maxTokens && options.maxTokens < 2000
       ? 'gemini-2.0-flash-001'
       : 'gemini-2.5-pro';
 
-    console.log('[GEMINI] 🚀 Starting generation');
-    console.log('[GEMINI] 📊 Model:', modelName);
-    console.log('[GEMINI] ⚙️  Config:', {
+    console.log(`[GEMINI] [${new Date().toISOString()}] [${requestId}] 🚀 Starting generation`);
+    console.log(`[GEMINI] [${requestId}] 📊 Model:`, modelName);
+    console.log(`[GEMINI] [${requestId}] ⚙️  Config:`, {
       temperature: options?.temperature || 0.7,
       maxTokens: options?.maxTokens || 2048,
     });
@@ -74,8 +76,8 @@ export class GeminiProvider implements LLMProvider {
     for (const msg of messages) {
       if (msg.imageData) {
         const imageSize = msg.imageData.length;
-        console.log('[GEMINI] 🖼️  Image detected, size:', (imageSize / 1024).toFixed(2), 'KB');
-        console.log('[GEMINI] 🖼️  Image format:', msg.imageData.substring(0, 30) + '...');
+        console.log(`[GEMINI] [${requestId}] 🖼️  Image detected, size:`, (imageSize / 1024).toFixed(2), 'KB');
+        console.log(`[GEMINI] [${requestId}] 🖼️  Image format:`, msg.imageData.substring(0, 30) + '...');
 
         parts.push({
           inlineData: {
@@ -87,7 +89,8 @@ export class GeminiProvider implements LLMProvider {
       parts.push({ text: `${msg.role}: ${msg.content}` });
     }
 
-    console.log('[GEMINI] 📤 Sending request to Gemini API...');
+    const apiStart = Date.now();
+    console.log(`[GEMINI] [${new Date().toISOString()}] [${requestId}] 📤 Sending request to Gemini API...`);
     const result = await model.generateContent({
       contents: [{ role: 'user', parts }],
       generationConfig: {
@@ -95,10 +98,11 @@ export class GeminiProvider implements LLMProvider {
         maxOutputTokens: options?.maxTokens || 2048,
       },
     });
+    const apiDuration = Date.now() - apiStart;
 
-    console.log('[GEMINI] 📥 Received response from Gemini API');
-    console.log('[GEMINI] 🔍 FULL API RESPONSE OBJECT:');
-    console.log('[GEMINI] ═══════════════════════════════════════════════════════════');
+    console.log(`[GEMINI] [${new Date().toISOString()}] [${requestId}] 📥 Received response from Gemini API in ${apiDuration}ms`);
+    console.log(`[GEMINI] [${requestId}] 🔍 FULL API RESPONSE OBJECT:`);
+    console.log(`[GEMINI] [${requestId}] ═══════════════════════════════════════════════════════════`);
     console.log(JSON.stringify(result, null, 2));
     console.log('[GEMINI] ═══════════════════════════════════════════════════════════');
 
@@ -147,6 +151,8 @@ export class GeminiProvider implements LLMProvider {
     console.log('[GEMINI] ═══════════════════════════════════════════════════════════');
 
     // Use ExpertParser for robust multi-stage parsing
+    const parseStart = Date.now();
+    console.log(`[GEMINI] [${new Date().toISOString()}] [${requestId}] 🔍 Starting response parsing...`);
     const parser = new ExpertParser({
       enableSelfHealing: false, // Disabled to avoid circular dependency
       fallbackToPartial: true,
@@ -155,6 +161,8 @@ export class GeminiProvider implements LLMProvider {
     });
 
     const parsed = await parser.parse(text, 'gemini');
+    const parseDuration = Date.now() - parseStart;
+    console.log(`[GEMINI] [${new Date().toISOString()}] [${requestId}] ✅ Parsing complete in ${parseDuration}ms`);
 
     // Add token usage
     parsed.tokensUsed = (response as any).usageMetadata?.totalTokenCount;
@@ -175,6 +183,9 @@ export class GeminiProvider implements LLMProvider {
         error: a.error,
       })));
     }
+
+    const totalDuration = Date.now() - startTime;
+    console.log(`[GEMINI] [${new Date().toISOString()}] [${requestId}] ✅ Total generation time: ${totalDuration}ms (API: ${apiDuration}ms, Parse: ${parseDuration}ms)`);
 
     return parsed;
   }
