@@ -88,38 +88,15 @@ export async function chatRoutes(server: FastifyInstance) {
       });
       console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ User message created in ${Date.now() - msgStart}ms, ID: ${userMessage.id}`);
 
-      // REGION DETECTION (Smart Cache - only on first capture with image)
+      // REGION DETECTION - DISABLED (not being used by frontend/extension)
+      // Saves ~2.1 seconds per request
       let regionData = null;
-      if (RegionDetectionService.shouldDetectRegions(imageData, true)) {
-        console.log(`[CHAT/START] [${new Date().toISOString()}] 🔍 Running region detection (first capture)...`);
-        const regionStartTime = Date.now();
-        try {
-          const { regionData: detected, fromCache } = await regionService.detectOrUseCache(
-            session.id,
-            imageData!,
-            false // Don't force, use cache if available
-          );
-          regionData = detected;
-          const regionDuration = Date.now() - regionStartTime;
-          console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ Region detection complete (${regionDuration}ms, fromCache: ${fromCache})`);
-          console.log(`[CHAT/START] 📊 Found ${detected.questionCount} question(s)`);
+      console.log(`[CHAT/START] [${new Date().toISOString()}] ⏭️ Skipping region detection (feature disabled)`);
 
-          // Update attachment with region data
-          if (userMessage.attachments[0]) {
-            const updateStart = Date.now();
-            await prisma.attachment.update({
-              where: { id: userMessage.attachments[0].id },
-              data: {
-                regionData: regionData as any,
-              },
-            });
-            console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ Attachment updated in ${Date.now() - updateStart}ms`);
-          }
-        } catch (error: any) {
-          console.error(`[CHAT/START] [${new Date().toISOString()}] ⚠️  Region detection failed, continuing without it:`, error.message);
-          // Don't fail the whole request if region detection fails
-        }
-      }
+      // TODO: Re-enable when implementing multi-question support
+      // if (RegionDetectionService.shouldDetectRegions(imageData, true)) {
+      //   ... region detection code ...
+      // }
 
       // Build LLM messages
       console.log(`[CHAT/START] [${new Date().toISOString()}] 🤖 Building LLM message array...`);
@@ -318,36 +295,10 @@ export async function chatRoutes(server: FastifyInstance) {
         },
       });
 
-      // REGION DETECTION (Smart Cache - uses cache if available, only runs on new captures)
+      // REGION DETECTION - DISABLED (not being used by frontend/extension)
+      // Saves ~2.1 seconds per request
       let regionData = null;
-      const isNewCapture = !!imageData;
-      if (RegionDetectionService.shouldDetectRegions(imageData, isNewCapture)) {
-        console.log('[CHAT/MESSAGE] 🔍 Checking region detection cache...');
-        const regionStartTime = Date.now();
-        try {
-          const { regionData: detected, fromCache } = await regionService.detectOrUseCache(
-            session.id,
-            imageData!,
-            false // Use cache if available
-          );
-          regionData = detected;
-          const regionDuration = Date.now() - regionStartTime;
-          console.log(`[CHAT/MESSAGE] ✅ Region detection ${fromCache ? 'from CACHE' : 'NEW'} (${regionDuration}ms)`);
-          console.log(`[CHAT/MESSAGE] 📊 Found ${detected.questionCount} question(s)`);
-
-          // Update attachment with region data
-          if (userMessage.attachments[0]) {
-            await prisma.attachment.update({
-              where: { id: userMessage.attachments[0].id },
-              data: {
-                regionData: regionData as any,
-              },
-            });
-          }
-        } catch (error: any) {
-          console.error('[CHAT/MESSAGE] ⚠️  Region detection failed, continuing without it:', error.message);
-        }
-      }
+      console.log('[CHAT/MESSAGE] ⏭️ Skipping region detection (feature disabled)');
 
       // Build conversation history for LLM
       // IMPORTANT: Don't include images from previous messages to avoid token overflow
