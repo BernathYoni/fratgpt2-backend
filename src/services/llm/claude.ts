@@ -52,9 +52,8 @@ export class ClaudeProvider implements LLMProvider {
   async generate(messages: LLMMessage[], options?: LLMOptions): Promise<LLMResponse> {
     const startTime = Date.now();
     const requestId = options?.requestId || 'SINGLE';
-    const model = options?.maxTokens && options.maxTokens < 2000
-      ? 'claude-haiku-4-5-20251001'
-      : 'claude-sonnet-4-5-20250929';
+    // Always use Claude Sonnet 4.5 (best quality model)
+    const model = 'claude-sonnet-4-5-20250929';
 
     console.log(`[CLAUDE] [${new Date().toISOString()}] [${requestId}] 🚀 Starting generation`);
     console.log(`[CLAUDE] [${requestId}] 📊 Model:`, model);
@@ -64,7 +63,18 @@ export class ClaudeProvider implements LLMProvider {
     });
     console.log(`[CLAUDE] [${requestId}] 📨 Messages count:`, messages.length);
 
-    try {
+    // Retry logic for 529 overloaded errors
+    const maxRetries = 2;
+    let lastError: any;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (attempt > 0) {
+        const waitTime = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 1s, 2s
+        console.log(`[CLAUDE] [${requestId}] 🔄 Retry attempt ${attempt}/${maxRetries} after ${waitTime}ms wait...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+
+      try {
 
       // Build messages array
       const claudeMessages: Anthropic.MessageParam[] = [];
@@ -191,13 +201,31 @@ export class ClaudeProvider implements LLMProvider {
       console.log(`[CLAUDE] [${new Date().toISOString()}] [${requestId}] ✅ Total generation time: ${totalDuration}ms (API: ${apiDuration}ms, Parse: ${parseDuration}ms)`);
 
       return parsed;
-    } catch (error: any) {
-      console.error(`[CLAUDE] [${new Date().toISOString()}] ❌ ERROR in generate:`);
-      console.error('[CLAUDE] ❌ Error name:', error?.name);
-      console.error('[CLAUDE] ❌ Error message:', error?.message);
-      console.error('[CLAUDE] ❌ Error status:', error?.status);
-      console.error('[CLAUDE] ❌ Full error:', error);
-      throw error; // Re-throw so orchestrator can catch it
+      } catch (error: any) {
+        lastError = error;
+        console.error(`[CLAUDE] [${new Date().toISOString()}] [${requestId}] ❌ ERROR on attempt ${attempt + 1}/${maxRetries + 1}`);
+        console.error('[CLAUDE] ❌ Error name:', error?.name);
+        console.error('[CLAUDE] ❌ Error message:', error?.message);
+        console.error('[CLAUDE] ❌ Error status:', error?.status);
+
+        // Check if this is a retryable error (529 overloaded)
+        const isOverloaded = error?.status === 529 || error?.message?.includes('overloaded');
+        const isRateLimited = error?.status === 429;
+        const isRetryable = isOverloaded || isRateLimited;
+
+        if (!isRetryable || attempt === maxRetries) {
+          // Not retryable or out of retries, throw immediately
+          console.error('[CLAUDE] ❌ Error is not retryable or max retries reached, throwing...');
+          throw error;
+        }
+
+        console.warn(`[CLAUDE] [${requestId}] ⚠️  Retryable error (${error?.status}), will retry...`);
+        // Continue to next iteration of retry loop
+      }
     }
+
+    // If we get here, all retries failed
+    console.error('[CLAUDE] ❌ All retry attempts exhausted');
+    throw lastError;
   }
 }
