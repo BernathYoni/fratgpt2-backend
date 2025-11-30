@@ -115,7 +115,16 @@ export class OpenAIProvider implements LLMProvider {
 
     console.log('[OPENAI] 🔍 Choices count:', completion.choices?.length ?? 0);
     console.log('[OPENAI] 🔍 Finish reason:', completion.choices[0]?.finish_reason);
-    console.log('[OPENAI] 🔍 Usage:', completion.usage);
+    console.log('[OPENAI] 📊 DETAILED TOKEN USAGE:');
+    console.log('[OPENAI]    Prompt tokens:', completion.usage?.prompt_tokens ?? 0);
+    console.log('[OPENAI]    Completion tokens:', completion.usage?.completion_tokens ?? 0);
+    console.log('[OPENAI]    Total tokens:', completion.usage?.total_tokens ?? 0);
+    if (completion.usage?.prompt_tokens_details?.cached_tokens) {
+      console.log('[OPENAI]    Cached tokens:', completion.usage.prompt_tokens_details.cached_tokens, '(saved money!)');
+    }
+    if (completion.usage?.completion_tokens_details?.reasoning_tokens) {
+      console.log('[OPENAI]    Reasoning tokens:', completion.usage.completion_tokens_details.reasoning_tokens);
+    }
 
     if (completion.choices[0]?.finish_reason && completion.choices[0].finish_reason !== 'stop') {
       console.error('[OPENAI] ⚠️  WARNING: Finish reason is not stop:', completion.choices[0].finish_reason);

@@ -128,7 +128,10 @@ export class ClaudeProvider implements LLMProvider {
       console.log('[CLAUDE] 🔍 Response ID:', response.id);
       console.log('[CLAUDE] 🔍 Stop reason:', response.stop_reason);
       console.log('[CLAUDE] 🔍 Content blocks:', response.content?.length ?? 0);
-      console.log('[CLAUDE] 📊 Tokens used:', response.usage.input_tokens + response.usage.output_tokens);
+      console.log('[CLAUDE] 📊 DETAILED TOKEN USAGE:');
+      console.log('[CLAUDE]    Input tokens:', response.usage.input_tokens);
+      console.log('[CLAUDE]    Output tokens:', response.usage.output_tokens);
+      console.log('[CLAUDE]    Total tokens:', response.usage.input_tokens + response.usage.output_tokens);
 
       if (response.stop_reason && response.stop_reason !== 'end_turn') {
         console.error('[CLAUDE] ⚠️  WARNING: Stop reason is not end_turn:', response.stop_reason);

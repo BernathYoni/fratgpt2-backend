@@ -112,6 +112,22 @@ export class GeminiProvider implements LLMProvider {
     console.log('[GEMINI] 🔍 Response object type:', typeof response);
     console.log('[GEMINI] 🔍 Response candidates:', response.candidates?.length ?? 0);
 
+    // Log detailed token usage
+    const usage = (response as any).usageMetadata;
+    if (usage) {
+      console.log('[GEMINI] 📊 DETAILED TOKEN USAGE:');
+      console.log('[GEMINI]    Prompt tokens:', usage.promptTokenCount ?? 0);
+      console.log('[GEMINI]    Response tokens:', usage.candidatesTokenCount ?? 0);
+      console.log('[GEMINI]    Thinking tokens:', usage.thoughtsTokenCount ?? 0, '(internal reasoning)');
+      console.log('[GEMINI]    Total tokens:', usage.totalTokenCount ?? 0);
+      if (usage.promptTokensDetails) {
+        console.log('[GEMINI]    Prompt breakdown:');
+        usage.promptTokensDetails.forEach((detail: any) => {
+          console.log(`[GEMINI]      - ${detail.modality}: ${detail.tokenCount} tokens`);
+        });
+      }
+    }
+
     // Check for safety blocks or finish reasons
     if (response.candidates && response.candidates.length > 0) {
       const candidate = response.candidates[0];
