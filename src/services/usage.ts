@@ -35,6 +35,25 @@ export class UsageService {
    * Check if user can make another solve request (with mode restriction check)
    */
   static async checkLimit(userId: string, mode?: ChatMode): Promise<UsageCheckResult> {
+    // Check if user is an admin - admins have unlimited access
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    if (user?.role === 'ADMIN') {
+      // Admin users have unlimited access to all modes
+      return {
+        allowed: true,
+        plan: 'PRO', // Display as PRO for UI purposes
+        limitType: 'cost',
+        limit: Infinity,
+        used: 0,
+        remaining: Infinity,
+        modeAllowed: true,
+      };
+    }
+
     const plan = await this.getUserPlan(userId);
     const planConfig = PLAN_LIMITS[plan];
     const currentMonth = this.getMonthStart();
@@ -330,8 +349,16 @@ export class UsageService {
    * Get usage stats for a user (updated for monthly limits)
    */
   static async getStats(userId: string, days: number = 30) {
+    // Check if user is an admin
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
     const plan = await this.getUserPlan(userId);
-    const planConfig = PLAN_LIMITS[plan];
+    const planConfig = user?.role === 'ADMIN'
+      ? { type: 'cost' as const, limit: Infinity }
+      : PLAN_LIMITS[plan];
     const today = this.getToday();
     const monthStart = this.getMonthStart();
 
