@@ -390,4 +390,32 @@ export async function adminRoutes(server: FastifyInstance) {
       return reply.code(500).send({ error: 'Internal server error' });
     }
   });
+
+  /**
+   * POST /admin/reset-stats
+   *
+   * Reset all AdminStats and Usage data (for testing)
+   */
+  server.post('/reset-stats', { preHandler: requireAdmin }, async (request, reply) => {
+    try {
+      console.log('[ADMIN/RESET] Resetting all stats data...');
+
+      // Delete all AdminStats records
+      const deletedAdminStats = await prisma.adminStats.deleteMany({});
+      console.log(`[ADMIN/RESET] Deleted ${deletedAdminStats.count} AdminStats records`);
+
+      // Delete all Usage records
+      const deletedUsage = await prisma.usage.deleteMany({});
+      console.log(`[ADMIN/RESET] Deleted ${deletedUsage.count} Usage records`);
+
+      return reply.send({
+        success: true,
+        deletedAdminStats: deletedAdminStats.count,
+        deletedUsage: deletedUsage.count,
+      });
+    } catch (error) {
+      server.log.error(error);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
 }
