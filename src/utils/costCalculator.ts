@@ -7,12 +7,12 @@
  *
  * REGULAR Mode:
  * - Gemini 2.5 Pro: $1.25 input, $5.00 output
- * - OpenAI GPT-4 Turbo: $10.00 input, $30.00 output
+ * - ChatGPT 4.1 (gpt-4.1-turbo): $10.00 input, $30.00 output
  * - Claude 3.5 Sonnet: $3.00 input, $15.00 output, $3.75 thinking
  *
  * EXPERT Mode:
- * - Gemini Experimental 1206 (3.0): $10.00 input, $40.00 output (estimated)
- * - OpenAI o1: $15.00 input, $60.00 output (estimated)
+ * - Gemini 3.0 (gemini-exp-1206): $10.00 input, $40.00 output (estimated)
+ * - ChatGPT 5.1 (chatgpt-4o-latest): $15.00 input, $60.00 output (estimated)
  * - Claude 3.5 Sonnet: $3.00 input, $15.00 output, $3.75 thinking
  */
 
