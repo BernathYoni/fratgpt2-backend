@@ -272,13 +272,8 @@ export async function chatRoutes(server: FastifyInstance) {
             }
           }
 
-          // Expert mode also uses Gemini Flash for consensus (if available)
-          if (result.primary?.tokenUsage) {
-            tokenUsage.geminiFlash = {
-              input: result.primary.tokenUsage.inputTokens,
-              output: result.primary.tokenUsage.outputTokens,
-            };
-          }
+          // Expert mode does NOT use Gemini Flash - only the 3 premium providers
+          // (removed incorrect consensus tracking that was double-counting tokens)
         } else if (mode === 'FAST') {
           // Fast mode uses Gemini Flash
           if (result.primary?.tokenUsage) {
