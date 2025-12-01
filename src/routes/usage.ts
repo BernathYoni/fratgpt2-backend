@@ -11,7 +11,7 @@ export async function usageRoutes(server: FastifyInstance) {
       server.log.info(`[USAGE-STATS] User ID: ${userId}`);
 
       const stats = await UsageService.getStats(userId);
-      server.log.info(`[USAGE-STATS] ✓ Stats retrieved - Today used: ${stats.today.used}, Plan: ${stats.plan}`);
+      server.log.info(`[USAGE-STATS] ✓ Stats retrieved - Monthly used: ${stats.monthly.used}, Plan: ${stats.plan}`);
       server.log.info('[USAGE-STATS] ✅ Stats sent successfully');
 
       return reply.send(stats);

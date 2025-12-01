@@ -46,7 +46,7 @@ export async function requireAdmin(request: FastifyRequest, reply: FastifyReply)
     (request as any).user = user;
 
   } catch (error) {
-    request.log.error('[REQUIRE-ADMIN] Error:', error);
+    request.log.error(`[REQUIRE-ADMIN] Error: ${error}`);
     return reply.code(401).send({
       error: 'Unauthorized',
       code: 'AUTH_FAILED'

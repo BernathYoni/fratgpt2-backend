@@ -113,16 +113,16 @@ export class GeminiProvider implements LLMProvider {
     console.log('[GEMINI] 🔍 Response candidates:', response.candidates?.length ?? 0);
 
     // Log detailed token usage
-    const usage = (response as any).usageMetadata;
-    if (usage) {
+    const usageMetadata = (response as any).usageMetadata;
+    if (usageMetadata) {
       console.log('[GEMINI] 📊 DETAILED TOKEN USAGE:');
-      console.log('[GEMINI]    Prompt tokens:', usage.promptTokenCount ?? 0);
-      console.log('[GEMINI]    Response tokens:', usage.candidatesTokenCount ?? 0);
-      console.log('[GEMINI]    Thinking tokens:', usage.thoughtsTokenCount ?? 0, '(internal reasoning)');
-      console.log('[GEMINI]    Total tokens:', usage.totalTokenCount ?? 0);
-      if (usage.promptTokensDetails) {
+      console.log('[GEMINI]    Prompt tokens:', usageMetadata.promptTokenCount ?? 0);
+      console.log('[GEMINI]    Response tokens:', usageMetadata.candidatesTokenCount ?? 0);
+      console.log('[GEMINI]    Thinking tokens:', usageMetadata.thoughtsTokenCount ?? 0, '(internal reasoning)');
+      console.log('[GEMINI]    Total tokens:', usageMetadata.totalTokenCount ?? 0);
+      if (usageMetadata.promptTokensDetails) {
         console.log('[GEMINI]    Prompt breakdown:');
-        usage.promptTokensDetails.forEach((detail: any) => {
+        usageMetadata.promptTokensDetails.forEach((detail: any) => {
           console.log(`[GEMINI]      - ${detail.modality}: ${detail.tokenCount} tokens`);
         });
       }
@@ -182,13 +182,13 @@ export class GeminiProvider implements LLMProvider {
     console.log(`[GEMINI] [${new Date().toISOString()}] [${requestId}] ✅ Parsing complete in ${parseDuration}ms`);
 
     // Extract actual token usage from API response
-    const usage = (response as any).usageMetadata;
-    if (usage) {
+    const responseUsage = (response as any).usageMetadata;
+    if (responseUsage) {
       parsed.tokenUsage = {
-        inputTokens: usage.promptTokenCount || 0,
-        outputTokens: usage.candidatesTokenCount || 0,
-        totalTokens: usage.totalTokenCount || 0,
-        thinkingTokens: usage.thoughtsTokenCount || undefined,
+        inputTokens: responseUsage.promptTokenCount || 0,
+        outputTokens: responseUsage.candidatesTokenCount || 0,
+        totalTokens: responseUsage.totalTokenCount || 0,
+        thinkingTokens: responseUsage.thoughtsTokenCount || undefined,
       };
       // Keep backward compatibility
       parsed.tokensUsed = parsed.tokenUsage.totalTokens;
