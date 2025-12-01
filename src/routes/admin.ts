@@ -133,40 +133,46 @@ export async function adminRoutes(server: FastifyInstance) {
       // Aggregate costs using CostCalculator
       const costs = CostCalculator.aggregateCosts(statsRecords);
 
-      return reply.send({
-        period,
-        dateRange: {
-          start: startDate.toISOString(),
-          end: endDate.toISOString(),
-        },
-        geminiFlash: {
+      // Transform to frontend-expected format
+      const models = [
+        {
+          model: 'gemini-flash',
           inputTokens: Number(costs.geminiFlash.inputTokens),
           outputTokens: Number(costs.geminiFlash.outputTokens),
           cost: costs.geminiFlash.cost,
-          percentageOfTotal: costs.geminiFlash.percentageOfTotal,
+          percentage: costs.geminiFlash.percentageOfTotal || 0,
         },
-        geminiPro: {
+        {
+          model: 'gemini-pro',
           inputTokens: Number(costs.geminiPro.inputTokens),
           outputTokens: Number(costs.geminiPro.outputTokens),
           cost: costs.geminiPro.cost,
-          percentageOfTotal: costs.geminiPro.percentageOfTotal,
+          percentage: costs.geminiPro.percentageOfTotal || 0,
         },
-        openai: {
+        {
+          model: 'gpt-4',
           inputTokens: Number(costs.openai.inputTokens),
           outputTokens: Number(costs.openai.outputTokens),
           cost: costs.openai.cost,
-          percentageOfTotal: costs.openai.percentageOfTotal,
+          percentage: costs.openai.percentageOfTotal || 0,
         },
-        claude: {
+        {
+          model: 'claude',
           inputTokens: Number(costs.claude.inputTokens),
           outputTokens: Number(costs.claude.outputTokens),
           thinkingTokens: Number(costs.claude.thinkingTokens || 0),
           cost: costs.claude.cost,
-          percentageOfTotal: costs.claude.percentageOfTotal,
+          percentage: costs.claude.percentageOfTotal || 0,
         },
-        total: {
-          cost: costs.total.cost,
-          tokens: Number(costs.total.tokens),
+      ];
+
+      return reply.send({
+        totalCost: costs.total.cost,
+        models,
+        period,
+        dateRange: {
+          start: startDate.toISOString(),
+          end: endDate.toISOString(),
         },
       });
     } catch (error) {
