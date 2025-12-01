@@ -52,9 +52,18 @@ export class OpenAIProvider implements LLMProvider {
   async generate(messages: LLMMessage[], options?: LLMOptions): Promise<LLMResponse> {
     const startTime = Date.now();
     const requestId = options?.requestId || 'SINGLE';
-    const model = options?.maxTokens && options.maxTokens < 2000
-      ? 'gpt-4o-mini'
-      : 'gpt-4o';
+    // Select model based on mode:
+    // EXPERT: o1 (GPT-5.1 / o1)
+    // REGULAR: gpt-4.1-turbo
+    // Default: gpt-4o
+    let model: string;
+    if (options?.mode === 'EXPERT') {
+      model = 'o1';
+    } else if (options?.mode === 'REGULAR') {
+      model = 'gpt-4-turbo';
+    } else {
+      model = 'gpt-4o';
+    }
 
     console.log(`[OPENAI] [${new Date().toISOString()}] [${requestId}] 🚀 Starting generation`);
     console.log(`[OPENAI] [${requestId}] 📊 Model:`, model);

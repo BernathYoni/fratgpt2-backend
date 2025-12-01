@@ -85,24 +85,100 @@ export class LLMOrchestrator {
   }
 
   /**
-   * Regular mode: Use high-quality model
+   * Regular mode: Call all 3 providers with mid-tier models
    */
   private async generateRegular(messages: LLMMessage[]) {
     const startTime = Date.now();
-    console.log(`[REGULAR] [${new Date().toISOString()}] Calling Gemini with maxTokens=8192, temp=0.7`);
-    try {
-      const response = await this.gemini.generate(messages, {
-        maxTokens: 8192, // Increased from 2048 to account for thinking tokens (2047) + actual response
-        temperature: 0.7,
-        mode: 'REGULAR', // Use Pro model
-      });
-      const duration = Date.now() - startTime;
-      console.log(`[REGULAR] [${new Date().toISOString()}] ✅ Gemini responded successfully in ${duration}ms`);
-      return { primary: response };
-    } catch (error: any) {
-      console.error(`[REGULAR] [${new Date().toISOString()}] ❌ Gemini error:`, error?.message);
-      throw error;
-    }
+    const requestId = `REGULAR-${Date.now()}`;
+    console.log(`[REGULAR] [${new Date().toISOString()}] [${requestId}] 🚀 Starting Regular mode with 3 providers`);
+    console.log(`[REGULAR] [${new Date().toISOString()}] [${requestId}] 📤 Calling all 3 providers in parallel...`);
+
+    // Call all providers in parallel with Regular-mode models
+    const regularOptions = {
+      maxTokens: 8192,
+      temperature: 0.7,
+      requestId,
+      mode: 'REGULAR' as const, // Gemini 2.5 Pro, GPT-4 Turbo, Claude Sonnet 4.5
+    };
+
+    const parallelStart = Date.now();
+    console.log(`[REGULAR] [${new Date().toISOString()}] [${requestId}] ⏱️ GEMINI START at ${Date.now() - parallelStart}ms`);
+    console.log(`[REGULAR] [${new Date().toISOString()}] [${requestId}] ⏱️ OPENAI START at ${Date.now() - parallelStart}ms`);
+    console.log(`[REGULAR] [${new Date().toISOString()}] [${requestId}] ⏱️ CLAUDE START at ${Date.now() - parallelStart}ms`);
+
+    const results = await Promise.allSettled([
+      this.gemini.generate(messages, regularOptions).then(r => {
+        const elapsed = Date.now() - parallelStart;
+        console.log(`[REGULAR] [${new Date().toISOString()}] [${requestId}] ⏱️ GEMINI DONE at ${elapsed}ms`);
+        return { provider: 'gemini', response: r };
+      }),
+      this.openai.generate(messages, regularOptions).then(r => {
+        const elapsed = Date.now() - parallelStart;
+        console.log(`[REGULAR] [${new Date().toISOString()}] [${requestId}] ⏱️ OPENAI DONE at ${elapsed}ms`);
+        return { provider: 'openai', response: r };
+      }),
+      this.claude.generate(messages, regularOptions).then(r => {
+        const elapsed = Date.now() - parallelStart;
+        console.log(`[REGULAR] [${new Date().toISOString()}] [${requestId}] ⏱️ CLAUDE DONE at ${elapsed}ms`);
+        return { provider: 'claude', response: r };
+      }),
+    ]);
+    const parallelDuration = Date.now() - parallelStart;
+
+    console.log(`[REGULAR] [${new Date().toISOString()}] 📊 All provider calls completed in ${parallelDuration}ms`);
+    console.log('[REGULAR] ═══════════════════════════════════════════════════════════');
+
+    const providers: ProviderResult[] = results.map((result, idx) => {
+      const providerName = ['gemini', 'openai', 'claude'][idx];
+
+      if (result.status === 'fulfilled') {
+        const response = result.value.response;
+
+        console.log(`[REGULAR] ✅ ${providerName.toUpperCase()} SUCCESS`);
+        console.log(`[REGULAR]    shortAnswer: "${response.shortAnswer}"`);
+        console.log(`[REGULAR]    steps count: ${response.steps.length}`);
+        console.log(`[REGULAR]    confidence: ${response.confidence ?? 'N/A'}`);
+
+        if (response.warnings && response.warnings.length > 0) {
+          console.warn(`[REGULAR]    ⚠️  warnings:`, response.warnings);
+        }
+
+        return result.value;
+      } else {
+        console.error(`[REGULAR] ❌ ${providerName.toUpperCase()} FAILED`);
+        console.error(`[REGULAR]    Error: ${result.reason?.message || 'Unknown error'}`);
+        return {
+          provider: providerName,
+          response: {
+            shortAnswer: 'Error',
+            steps: ['Failed to get response from this provider'],
+            error: 'NETWORK_ERROR',
+          },
+          error: result.reason?.message || 'Unknown error',
+        };
+      }
+    });
+
+    console.log('[REGULAR] ═══════════════════════════════════════════════════════════');
+
+    // Use the first successful provider with highest confidence as primary
+    const sortedProviders = [...providers].sort((a, b) => {
+      const confA = a.response.confidence ?? 0;
+      const confB = b.response.confidence ?? 0;
+      return confB - confA;
+    });
+
+    const primaryProvider = sortedProviders.find(p => !p.error && !p.response.error);
+    const primary = primaryProvider ? primaryProvider.response : providers[0].response;
+
+    const totalDuration = Date.now() - startTime;
+    console.log(`[REGULAR] [${new Date().toISOString()}] ✅ Regular mode complete in ${totalDuration}ms - returning all provider responses`);
+    console.log(`[REGULAR] Primary provider: ${primaryProvider?.provider ?? 'none'}`);
+
+    return {
+      primary,
+      providers,
+    };
   }
 
   /**

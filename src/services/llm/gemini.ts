@@ -52,10 +52,18 @@ export class GeminiProvider implements LLMProvider {
   async generate(messages: LLMMessage[], options?: LLMOptions): Promise<LLMResponse> {
     const startTime = Date.now();
     const requestId = options?.requestId || 'SINGLE';
-    // Select model based on mode: FAST uses Flash, others use Pro
-    const modelName = options?.mode === 'FAST'
-      ? 'gemini-2.0-flash-001'
-      : 'gemini-2.5-pro';
+    // Select model based on mode:
+    // FAST: Gemini 2.0 Flash
+    // REGULAR: Gemini 2.5 Pro
+    // EXPERT: Gemini Experimental 1206 (3.0)
+    let modelName: string;
+    if (options?.mode === 'FAST') {
+      modelName = 'gemini-2.0-flash-001';
+    } else if (options?.mode === 'EXPERT') {
+      modelName = 'gemini-exp-1206';
+    } else {
+      modelName = 'gemini-2.5-pro';
+    }
 
     console.log(`[GEMINI] [${new Date().toISOString()}] [${requestId}] 🚀 Starting generation`);
     console.log(`[GEMINI] [${requestId}] 📊 Model:`, modelName);

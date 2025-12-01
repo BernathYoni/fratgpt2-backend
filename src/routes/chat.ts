@@ -245,14 +245,14 @@ export async function chatRoutes(server: FastifyInstance) {
         // Extract token usage from LLM response(s)
         const tokenUsage: any = {};
 
-        if (mode === 'EXPERT' && result.providers) {
-          // Expert mode - aggregate tokens from all providers
+        if ((mode === 'EXPERT' || mode === 'REGULAR') && result.providers) {
+          // Expert and Regular modes - both use 3 providers now
           for (const provider of result.providers) {
             if (provider.response.tokenUsage) {
               const tokens = provider.response.tokenUsage;
 
               if (provider.provider === 'gemini') {
-                // Gemini Pro is used in expert mode
+                // Gemini Pro for Regular, Gemini Exp 1206 for Expert
                 tokenUsage.geminiPro = {
                   input: tokens.inputTokens,
                   output: tokens.outputTokens,
@@ -271,21 +271,10 @@ export async function chatRoutes(server: FastifyInstance) {
               }
             }
           }
-
-          // Expert mode does NOT use Gemini Flash - only the 3 premium providers
-          // (removed incorrect consensus tracking that was double-counting tokens)
         } else if (mode === 'FAST') {
-          // Fast mode uses Gemini Flash
+          // Fast mode uses Gemini Flash only
           if (result.primary?.tokenUsage) {
             tokenUsage.geminiFlash = {
-              input: result.primary.tokenUsage.inputTokens,
-              output: result.primary.tokenUsage.outputTokens,
-            };
-          }
-        } else if (mode === 'REGULAR') {
-          // Regular mode uses Gemini Pro
-          if (result.primary?.tokenUsage) {
-            tokenUsage.geminiPro = {
               input: result.primary.tokenUsage.inputTokens,
               output: result.primary.tokenUsage.outputTokens,
             };

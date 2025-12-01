@@ -2,9 +2,17 @@
  * CostCalculator - Calculate API costs from token usage
  *
  * Pricing as of 2025 (per million tokens):
+ * FAST Mode:
  * - Gemini 2.0 Flash: $0.10 input, $0.40 output
+ *
+ * REGULAR Mode:
  * - Gemini 2.5 Pro: $1.25 input, $5.00 output
  * - OpenAI GPT-4 Turbo: $10.00 input, $30.00 output
+ * - Claude 3.5 Sonnet: $3.00 input, $15.00 output, $3.75 thinking
+ *
+ * EXPERT Mode:
+ * - Gemini Experimental 1206 (3.0): $10.00 input, $40.00 output (estimated)
+ * - OpenAI o1: $15.00 input, $60.00 output (estimated)
  * - Claude 3.5 Sonnet: $3.00 input, $15.00 output, $3.75 thinking
  */
 
