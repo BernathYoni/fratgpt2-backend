@@ -7,13 +7,13 @@
  *
  * REGULAR Mode:
  * - Gemini 2.5 Pro: $1.25 input, $5.00 output
- * - ChatGPT 4.1 (gpt-4.1-turbo): $10.00 input, $30.00 output
- * - Claude 3.5 Sonnet: $3.00 input, $15.00 output, $3.75 thinking
+ * - GPT-5 mini (gpt-5-mini): $0.25 input, $2.00 output
+ * - Claude 4.5 Sonnet: $3.00 input, $15.00 output, $3.75 thinking
  *
  * EXPERT Mode:
  * - Gemini 3.0 (gemini-exp-1206): $10.00 input, $40.00 output (estimated)
- * - ChatGPT 5.1 (chatgpt-4o-latest): $15.00 input, $60.00 output (estimated)
- * - Claude 3.5 Sonnet: $3.00 input, $15.00 output, $3.75 thinking
+ * - GPT-5.1 (gpt-5.1): $1.25 input, $10.00 output (GPT-5 pricing as proxy)
+ * - Claude 4.5 Sonnet: $3.00 input, $15.00 output, $3.75 thinking
  */
 
 export interface TokenCosts {
@@ -45,19 +45,19 @@ export class CostCalculator {
   // Pricing per million tokens (updated 2025)
   private static readonly PRICES = {
     GEMINI_FLASH: {
-      INPUT: 0.10,   // $0.10 per 1M input tokens
+      INPUT: 0.10,   // $0.10 per 1M input tokens (Gemini 2.0 Flash)
       OUTPUT: 0.40,  // $0.40 per 1M output tokens
     },
     GEMINI_PRO: {
-      INPUT: 1.25,   // $1.25 per 1M input tokens
+      INPUT: 1.25,   // $1.25 per 1M input tokens (Gemini 2.5 Pro)
       OUTPUT: 5.00,  // $5.00 per 1M output tokens
     },
     OPENAI: {
-      INPUT: 10.00,  // $10.00 per 1M input tokens (GPT-4 Turbo)
-      OUTPUT: 30.00, // $30.00 per 1M output tokens
+      INPUT: 1.25,   // $1.25 per 1M input tokens (GPT-5 / GPT-5.1 pricing)
+      OUTPUT: 10.00, // $10.00 per 1M output tokens
     },
     CLAUDE: {
-      INPUT: 3.00,    // $3.00 per 1M input tokens (Claude 3.5 Sonnet)
+      INPUT: 3.00,    // $3.00 per 1M input tokens (Claude 4.5 Sonnet)
       OUTPUT: 15.00,  // $15.00 per 1M output tokens
       THINKING: 3.75, // $3.75 per 1M thinking tokens (extended thinking)
     },

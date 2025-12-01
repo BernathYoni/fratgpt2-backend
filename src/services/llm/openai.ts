@@ -53,14 +53,14 @@ export class OpenAIProvider implements LLMProvider {
     const startTime = Date.now();
     const requestId = options?.requestId || 'SINGLE';
     // Select model based on mode:
-    // EXPERT: chatgpt-4o-latest (GPT-5.1 equivalent - latest GPT-4o)
-    // REGULAR: gpt-4.1-turbo (GPT-4.1)
+    // EXPERT: gpt-5.1 (GPT-5.1 - latest flagship model)
+    // REGULAR: gpt-5-mini (GPT-5 mini - faster, cost-effective)
     // Default: gpt-4o
     let model: string;
     if (options?.mode === 'EXPERT') {
-      model = 'chatgpt-4o-latest';
+      model = 'gpt-5.1';
     } else if (options?.mode === 'REGULAR') {
-      model = 'gpt-4.1-turbo';
+      model = 'gpt-5-mini';
     } else {
       model = 'gpt-4o';
     }
