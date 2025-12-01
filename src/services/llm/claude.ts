@@ -180,8 +180,20 @@ export class ClaudeProvider implements LLMProvider {
       const parseDuration = Date.now() - parseStart;
       console.log(`[CLAUDE] [${new Date().toISOString()}] [${requestId}] ✅ Parsing complete in ${parseDuration}ms`);
 
-      // Add token usage
-      parsed.tokensUsed = response.usage.input_tokens + response.usage.output_tokens;
+      // Extract actual token usage from API response
+      const inputTokens = response.usage.input_tokens || 0;
+      const outputTokens = response.usage.output_tokens || 0;
+      const totalTokens = inputTokens + outputTokens;
+
+      parsed.tokenUsage = {
+        inputTokens,
+        outputTokens,
+        totalTokens,
+      };
+
+      // Keep backward compatibility
+      parsed.tokensUsed = totalTokens;
+      console.log(`[CLAUDE] [${requestId}] 📊 Token usage extracted:`, parsed.tokenUsage);
 
       // Log parse quality
       if (parsed.confidence && parsed.confidence < 0.9) {

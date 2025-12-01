@@ -49,8 +49,51 @@ export async function chatRoutes(server: FastifyInstance) {
       console.log('[CHAT/START] Image size:', imageData ? `${(imageData.length / 1024).toFixed(2)} KB` : 'N/A');
       console.log('[CHAT/START] Capture source:', captureSource);
 
-      // Rate limiting disabled for testing
-      console.log('[CHAT/START] 📊 Rate limiting disabled for testing');
+      // Check rate limits and mode restrictions
+      const limitCheckStart = Date.now();
+      console.log(`[CHAT/START] [${new Date().toISOString()}] 📊 Checking rate limits...`);
+      const limitCheck = await UsageService.checkLimit(userId, mode as ChatMode);
+      console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ Limit check complete in ${Date.now() - limitCheckStart}ms`);
+
+      if (!limitCheck.modeAllowed) {
+        console.log(`[CHAT/START] [${new Date().toISOString()}] ❌ Mode not allowed:`, limitCheck.modeRestrictionReason);
+        return reply.code(403).send({
+          error: limitCheck.modeRestrictionReason,
+          code: 'MODE_RESTRICTED',
+          plan: limitCheck.plan,
+        });
+      }
+
+      if (!limitCheck.allowed) {
+        console.log(`[CHAT/START] [${new Date().toISOString()}] ❌ Rate limit exceeded`);
+        if (limitCheck.limitType === 'solves') {
+          return reply.code(429).send({
+            error: `Monthly limit reached (${limitCheck.used}/${limitCheck.limit} solves)`,
+            code: 'MONTHLY_LIMIT_REACHED',
+            plan: limitCheck.plan,
+            limit: limitCheck.limit,
+            used: limitCheck.used,
+            remaining: 0,
+          });
+        } else {
+          return reply.code(429).send({
+            error: `Monthly cost limit reached ($${limitCheck.used.toFixed(2)}/$${limitCheck.limit.toFixed(2)})`,
+            code: 'MONTHLY_COST_LIMIT_REACHED',
+            plan: limitCheck.plan,
+            limit: limitCheck.limit,
+            used: limitCheck.used,
+            remaining: 0,
+          });
+        }
+      }
+
+      console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ Rate limit check passed:`, {
+        plan: limitCheck.plan,
+        limitType: limitCheck.limitType,
+        used: limitCheck.used,
+        limit: limitCheck.limit,
+        remaining: limitCheck.remaining,
+      });
 
       // Create chat session
       const dbStart = Date.now();
@@ -194,8 +237,73 @@ export async function chatRoutes(server: FastifyInstance) {
       }
       console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ Assistant message(s) saved in ${Date.now() - saveStart}ms`);
 
-      // Usage tracking disabled for testing
-      console.log('[CHAT/START] 📊 Usage tracking disabled for testing');
+      // Track usage with token costs
+      const usageStart = Date.now();
+      console.log(`[CHAT/START] [${new Date().toISOString()}] 📊 Tracking usage and costs...`);
+
+      try {
+        // Extract token usage from LLM response(s)
+        const tokenUsage: any = {};
+
+        if (mode === 'EXPERT' && result.providers) {
+          // Expert mode - aggregate tokens from all providers
+          for (const provider of result.providers) {
+            if (provider.response.tokenUsage) {
+              const tokens = provider.response.tokenUsage;
+
+              if (provider.provider === 'gemini') {
+                // Gemini Pro is used in expert mode
+                tokenUsage.geminiPro = {
+                  input: tokens.inputTokens,
+                  output: tokens.outputTokens,
+                };
+              } else if (provider.provider === 'openai') {
+                tokenUsage.openai = {
+                  input: tokens.inputTokens,
+                  output: tokens.outputTokens,
+                };
+              } else if (provider.provider === 'claude') {
+                tokenUsage.claude = {
+                  input: tokens.inputTokens,
+                  output: tokens.outputTokens,
+                  thinking: tokens.thinkingTokens || 0,
+                };
+              }
+            }
+          }
+
+          // Expert mode also uses Gemini Flash for consensus (if available)
+          if (result.primary?.tokenUsage) {
+            tokenUsage.geminiFlash = {
+              input: result.primary.tokenUsage.inputTokens,
+              output: result.primary.tokenUsage.outputTokens,
+            };
+          }
+        } else if (mode === 'FAST') {
+          // Fast mode uses Gemini Flash
+          if (result.primary?.tokenUsage) {
+            tokenUsage.geminiFlash = {
+              input: result.primary.tokenUsage.inputTokens,
+              output: result.primary.tokenUsage.outputTokens,
+            };
+          }
+        } else if (mode === 'REGULAR') {
+          // Regular mode uses Gemini Pro
+          if (result.primary?.tokenUsage) {
+            tokenUsage.geminiPro = {
+              input: result.primary.tokenUsage.inputTokens,
+              output: result.primary.tokenUsage.outputTokens,
+            };
+          }
+        }
+
+        // Increment usage with token tracking
+        await UsageService.incrementSolve(userId, mode as ChatMode, tokenUsage);
+        console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ Usage tracked in ${Date.now() - usageStart}ms`);
+      } catch (error) {
+        console.error(`[CHAT/START] [${new Date().toISOString()}] ❌ Failed to track usage:`, error);
+        // Don't fail the request if usage tracking fails
+      }
 
       // Return session with messages
       const fetchStart = Date.now();

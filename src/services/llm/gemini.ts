@@ -181,8 +181,21 @@ export class GeminiProvider implements LLMProvider {
     const parseDuration = Date.now() - parseStart;
     console.log(`[GEMINI] [${new Date().toISOString()}] [${requestId}] ✅ Parsing complete in ${parseDuration}ms`);
 
-    // Add token usage
-    parsed.tokensUsed = (response as any).usageMetadata?.totalTokenCount;
+    // Extract actual token usage from API response
+    const usage = (response as any).usageMetadata;
+    if (usage) {
+      parsed.tokenUsage = {
+        inputTokens: usage.promptTokenCount || 0,
+        outputTokens: usage.candidatesTokenCount || 0,
+        totalTokens: usage.totalTokenCount || 0,
+        thinkingTokens: usage.thoughtsTokenCount || undefined,
+      };
+      // Keep backward compatibility
+      parsed.tokensUsed = parsed.tokenUsage.totalTokens;
+      console.log(`[GEMINI] [${requestId}] 📊 Token usage extracted:`, parsed.tokenUsage);
+    } else {
+      console.warn(`[GEMINI] [${requestId}] ⚠️  No usage metadata found in response`);
+    }
 
     // Log parse quality
     if (parsed.confidence && parsed.confidence < 0.9) {

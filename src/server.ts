@@ -7,6 +7,7 @@ import { chatRoutes } from './routes/chat';
 import { billingRoutes } from './routes/billing';
 import { webhookRoutes } from './routes/webhooks';
 import { usageRoutes } from './routes/usage';
+import { adminRoutes } from './routes/admin';
 
 const server = Fastify({
   logger: true,
@@ -41,6 +42,7 @@ async function start() {
     await server.register(billingRoutes, { prefix: '/billing' });
     await server.register(usageRoutes, { prefix: '/usage' });
     await server.register(webhookRoutes, { prefix: '/webhooks' });
+    await server.register(adminRoutes, { prefix: '/admin' });
 
     const port = parseInt(process.env.PORT || '3000', 10);
     const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';

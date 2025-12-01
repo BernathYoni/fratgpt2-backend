@@ -161,9 +161,50 @@ model Usage {
   modeExpertCount    Int      @default(0)
   tokensUsed         Int      @default(0)
 
+  // Detailed token tracking per provider
+  geminiFlashInputTokens  Int   @default(0)
+  geminiFlashOutputTokens Int   @default(0)
+  geminiFlashCost         Float @default(0)
+  geminiProInputTokens    Int   @default(0)
+  geminiProOutputTokens   Int   @default(0)
+  geminiProCost           Float @default(0)
+  openaiInputTokens       Int   @default(0)
+  openaiOutputTokens      Int   @default(0)
+  openaiCost              Float @default(0)
+  claudeInputTokens       Int   @default(0)
+  claudeOutputTokens      Int   @default(0)
+  claudeThinkingTokens    Int   @default(0)
+  claudeCost              Float @default(0)
+  totalMonthlyCost        Float @default(0)
+
   user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, date])
   @@index([userId])
+  @@index([date])
+}
+
+model AdminStats {
+  id                 String   @id @default(uuid())
+  date               DateTime @unique @db.Date
+
+  // Site-wide aggregated token tracking
+  geminiFlashInputTokens  BigInt @default(0)
+  geminiFlashOutputTokens BigInt @default(0)
+  geminiFlashCost         Float  @default(0)
+  geminiProInputTokens    BigInt @default(0)
+  geminiProOutputTokens   BigInt @default(0)
+  geminiProCost           Float  @default(0)
+  openaiInputTokens       BigInt @default(0)
+  openaiOutputTokens      BigInt @default(0)
+  openaiCost              Float  @default(0)
+  claudeInputTokens       BigInt @default(0)
+  claudeOutputTokens      BigInt @default(0)
+  claudeThinkingTokens    BigInt @default(0)
+  claudeCost              Float  @default(0)
+  totalMonthlyCost        Float  @default(0)
+
+  createdAt          DateTime @default(now())
+
   @@index([date])
 }

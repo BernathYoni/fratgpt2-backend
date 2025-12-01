@@ -169,8 +169,19 @@ export class OpenAIProvider implements LLMProvider {
     const parseDuration = Date.now() - parseStart;
     console.log(`[OPENAI] [${new Date().toISOString()}] [${requestId}] ✅ Parsing complete in ${parseDuration}ms`);
 
-    // Add token usage
-    parsed.tokensUsed = completion.usage?.total_tokens;
+    // Extract actual token usage from API response
+    if (completion.usage) {
+      parsed.tokenUsage = {
+        inputTokens: completion.usage.prompt_tokens || 0,
+        outputTokens: completion.usage.completion_tokens || 0,
+        totalTokens: completion.usage.total_tokens || 0,
+      };
+      // Keep backward compatibility
+      parsed.tokensUsed = parsed.tokenUsage.totalTokens;
+      console.log(`[OPENAI] [${requestId}] 📊 Token usage extracted:`, parsed.tokenUsage);
+    } else {
+      console.warn(`[OPENAI] [${requestId}] ⚠️  No usage data found in response`);
+    }
 
     // Log parse quality
     if (parsed.confidence && parsed.confidence < 0.9) {

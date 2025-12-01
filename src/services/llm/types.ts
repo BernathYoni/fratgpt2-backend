@@ -21,11 +21,22 @@ export interface ParseAttempt {
   timestamp: Date;
 }
 
+// Token usage breakdown
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  thinkingTokens?: number; // Claude-specific: extended thinking tokens
+}
+
 // Enhanced LLM response with metadata
 export interface LLMResponse {
   shortAnswer: string;
   steps: string[];
-  tokensUsed?: number;
+  tokensUsed?: number; // Deprecated: use tokenUsage instead
+
+  // Token usage details
+  tokenUsage?: TokenUsage;
 
   // Parse metadata
   confidence?: ParseConfidence;
