@@ -90,42 +90,45 @@ export async function adminRoutes(server: FastifyInstance) {
 
       console.log(`[ADMIN/STATS] Found ${statsRecords.length} stats records`);
 
-      // If no records, return zeros
+      // If no records, return zeros in correct format
       if (statsRecords.length === 0) {
         return reply.send({
+          totalCost: 0,
+          models: [
+            {
+              model: 'gemini-flash',
+              inputTokens: 0,
+              outputTokens: 0,
+              cost: 0,
+              percentage: 0,
+            },
+            {
+              model: 'gemini-pro',
+              inputTokens: 0,
+              outputTokens: 0,
+              cost: 0,
+              percentage: 0,
+            },
+            {
+              model: 'gpt-4',
+              inputTokens: 0,
+              outputTokens: 0,
+              cost: 0,
+              percentage: 0,
+            },
+            {
+              model: 'claude',
+              inputTokens: 0,
+              outputTokens: 0,
+              thinkingTokens: 0,
+              cost: 0,
+              percentage: 0,
+            },
+          ],
           period,
           dateRange: {
             start: startDate.toISOString(),
             end: endDate.toISOString(),
-          },
-          geminiFlash: {
-            inputTokens: 0,
-            outputTokens: 0,
-            cost: 0,
-            percentageOfTotal: 0,
-          },
-          geminiPro: {
-            inputTokens: 0,
-            outputTokens: 0,
-            cost: 0,
-            percentageOfTotal: 0,
-          },
-          openai: {
-            inputTokens: 0,
-            outputTokens: 0,
-            cost: 0,
-            percentageOfTotal: 0,
-          },
-          claude: {
-            inputTokens: 0,
-            outputTokens: 0,
-            thinkingTokens: 0,
-            cost: 0,
-            percentageOfTotal: 0,
-          },
-          total: {
-            cost: 0,
-            tokens: 0,
           },
         });
       }
