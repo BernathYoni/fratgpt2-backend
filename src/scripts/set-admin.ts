@@ -14,7 +14,7 @@
 
 import { prisma } from '../db/client';
 
-const ADMIN_EMAIL = 'Bernath.yoni@gmail.com';
+const ADMIN_EMAIL = 'bernath.yoni@gmail.com';
 
 async function setAdmin() {
   try {
