@@ -111,7 +111,7 @@ export class OpenAIProvider implements LLMProvider {
       model,
       messages: openaiMessages,
       temperature: options?.temperature || 0.7,
-      max_tokens: options?.maxTokens || 2048,
+      max_completion_tokens: options?.maxTokens || 2048, // GPT-5+ uses max_completion_tokens
       response_format: { type: 'json_object' },
     });
     const apiDuration = Date.now() - apiStart;
