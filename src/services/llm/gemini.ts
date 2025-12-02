@@ -55,12 +55,12 @@ export class GeminiProvider implements LLMProvider {
     // Select model based on mode:
     // FAST: Gemini 2.0 Flash
     // REGULAR: Gemini 2.5 Pro
-    // EXPERT: Gemini 3.0 Pro (gemini-3-pro-preview-11-2025)
+    // EXPERT: Gemini 3.0 Pro (gemini-3-pro-preview via v1beta API)
     let modelName: string;
     if (options?.mode === 'FAST') {
       modelName = 'gemini-2.0-flash-001';
     } else if (options?.mode === 'EXPERT') {
-      modelName = 'gemini-3-pro-preview-11-2025'; // Gemini 3.0 Pro preview (November 2025)
+      modelName = 'gemini-3-pro-preview'; // Gemini 3.0 Pro preview (requires v1beta API)
     } else {
       modelName = 'gemini-2.5-pro';
     }
@@ -72,7 +72,15 @@ export class GeminiProvider implements LLMProvider {
       maxTokens: options?.maxTokens || 2048,
     });
 
-    const model = this.client.getGenerativeModel({ model: modelName });
+    // Gemini 3 Pro preview requires v1beta API, others use default v1
+    const requiresBeta = modelName === 'gemini-3-pro-preview';
+    const model = requiresBeta
+      ? this.client.getGenerativeModel({ model: modelName }, { apiVersion: 'v1beta' })
+      : this.client.getGenerativeModel({ model: modelName });
+
+    if (requiresBeta) {
+      console.log(`[GEMINI] [${requestId}] ⚠️  Using v1beta API for ${modelName}`);
+    }
 
     // Build the prompt
     const parts: any[] = [];
