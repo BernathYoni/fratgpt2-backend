@@ -72,15 +72,8 @@ export class GeminiProvider implements LLMProvider {
       maxTokens: options?.maxTokens || 2048,
     });
 
-    // Gemini 3 Pro preview requires v1beta API, others use default v1
-    const requiresBeta = modelName === 'gemini-3-pro-preview';
-    const model = requiresBeta
-      ? this.client.getGenerativeModel({ model: modelName }, { apiVersion: 'v1beta' })
-      : this.client.getGenerativeModel({ model: modelName });
-
-    if (requiresBeta) {
-      console.log(`[GEMINI] [${requestId}] ⚠️  Using v1beta API for ${modelName}`);
-    }
+    // Get the model - newer SDK versions default to v1beta which supports all models
+    const model = this.client.getGenerativeModel({ model: modelName });
 
     // Build the prompt
     const parts: any[] = [];
