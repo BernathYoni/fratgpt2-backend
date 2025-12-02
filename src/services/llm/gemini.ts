@@ -55,12 +55,12 @@ export class GeminiProvider implements LLMProvider {
     // Select model based on mode:
     // FAST: Gemini 2.0 Flash
     // REGULAR: Gemini 2.5 Pro
-    // EXPERT: Gemini 3.0 Pro (gemini-3-pro-preview)
+    // EXPERT: Gemini 3.0 Pro (gemini-3-pro-preview-11-2025)
     let modelName: string;
     if (options?.mode === 'FAST') {
       modelName = 'gemini-2.0-flash-001';
     } else if (options?.mode === 'EXPERT') {
-      modelName = 'gemini-3-pro-preview'; // Gemini 3.0 Pro preview
+      modelName = 'gemini-3-pro-preview-11-2025'; // Gemini 3.0 Pro preview (November 2025)
     } else {
       modelName = 'gemini-2.5-pro';
     }
