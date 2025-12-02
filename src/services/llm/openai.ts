@@ -107,13 +107,24 @@ export class OpenAIProvider implements LLMProvider {
 
     const apiStart = Date.now();
     console.log(`[OPENAI] [${new Date().toISOString()}] [${requestId}] 📤 Sending request to OpenAI API...`);
-    const completion = await this.client.chat.completions.create({
+
+    // GPT-5 models only support default temperature (1), cannot be customized
+    const isGPT5 = model.startsWith('gpt-5');
+    const requestParams: any = {
       model,
       messages: openaiMessages,
-      temperature: options?.temperature || 0.7,
       max_completion_tokens: options?.maxTokens || 2048, // GPT-5+ uses max_completion_tokens
       response_format: { type: 'json_object' },
-    });
+    };
+
+    // Only set temperature for non-GPT-5 models
+    if (!isGPT5) {
+      requestParams.temperature = options?.temperature || 0.7;
+    } else {
+      console.log(`[OPENAI] [${requestId}] ⚠️  Skipping temperature for ${model} (only default supported)`);
+    }
+
+    const completion = await this.client.chat.completions.create(requestParams);
     const apiDuration = Date.now() - apiStart;
 
     console.log(`[OPENAI] [${new Date().toISOString()}] [${requestId}] 📥 Received response from OpenAI API in ${apiDuration}ms`);
