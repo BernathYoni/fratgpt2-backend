@@ -165,7 +165,7 @@ export async function chatRoutes(server: FastifyInstance) {
       console.log(`[CHAT/START] 🔍 DEBUG: mode = "${mode}"`);
       console.log(`[CHAT/START] 🔍 DEBUG: result.providers exists = ${!!result.providers}`);
       console.log(`[CHAT/START] 🔍 DEBUG: result.providers count = ${result.providers?.length || 0}`);
-      console.log(`[CHAT/START] 🔍 DEBUG: Will save multi-provider = ${mode === 'EXPERT' && !!result.providers}`);
+      console.log(`[CHAT/START] 🔍 DEBUG: Will save multi-provider = ${(mode === 'EXPERT' || mode === 'REGULAR') && !!result.providers}`);
       if (result.providers) {
         console.log(`[CHAT/START] 🔍 DEBUG: Provider list:`, result.providers.map(p => ({
           provider: p.provider,
@@ -174,7 +174,7 @@ export async function chatRoutes(server: FastifyInstance) {
           stepsCount: p.response?.steps?.length || 0
         })));
       }
-      if (mode === 'EXPERT' && result.providers) {
+      if ((mode === 'EXPERT' || mode === 'REGULAR') && result.providers) {
         // Save all provider responses (no consensus)
         console.log(`[CHAT/START] 💾 Entering EXPERT/multi-provider save block - saving ${result.providers.length} messages`);
         for (const provider of result.providers) {
@@ -452,7 +452,7 @@ export async function chatRoutes(server: FastifyInstance) {
       const result = await orchestrator.generate(effectiveMode as ChatMode, llmMessages);
 
       // Save response(s) with structured answer data
-      if (effectiveMode === 'EXPERT' && result.providers) {
+      if ((effectiveMode === 'EXPERT' || effectiveMode === 'REGULAR') && result.providers) {
         // Save all provider responses (no consensus)
         for (const provider of result.providers) {
           // Try to extract structured answer from response
