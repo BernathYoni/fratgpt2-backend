@@ -162,9 +162,25 @@ export async function chatRoutes(server: FastifyInstance) {
       // Save assistant message(s) with structured answer data
       const saveStart = Date.now();
       console.log(`[CHAT/START] [${new Date().toISOString()}] 💾 Saving assistant message(s)...`);
+      console.log(`[CHAT/START] 🔍 DEBUG: mode = "${mode}"`);
+      console.log(`[CHAT/START] 🔍 DEBUG: result.providers exists = ${!!result.providers}`);
+      console.log(`[CHAT/START] 🔍 DEBUG: result.providers count = ${result.providers?.length || 0}`);
+      console.log(`[CHAT/START] 🔍 DEBUG: Will save multi-provider = ${mode === 'EXPERT' && !!result.providers}`);
+      if (result.providers) {
+        console.log(`[CHAT/START] 🔍 DEBUG: Provider list:`, result.providers.map(p => ({
+          provider: p.provider,
+          hasResponse: !!p.response,
+          shortAnswer: p.response?.shortAnswer?.substring(0, 50),
+          stepsCount: p.response?.steps?.length || 0
+        })));
+      }
       if (mode === 'EXPERT' && result.providers) {
         // Save all provider responses (no consensus)
+        console.log(`[CHAT/START] 💾 Entering EXPERT/multi-provider save block - saving ${result.providers.length} messages`);
         for (const provider of result.providers) {
+          console.log(`[CHAT/START] 💾 Saving message for provider: ${provider.provider.toUpperCase()}`);
+          console.log(`[CHAT/START] 💾   - shortAnswer: ${provider.response.shortAnswer?.substring(0, 100)}...`);
+          console.log(`[CHAT/START] 💾   - steps count: ${provider.response.steps?.length || 0}`);
           // Try to extract structured answer from response
           let structuredAnswer = null;
           let questionType = null;
@@ -202,6 +218,15 @@ export async function chatRoutes(server: FastifyInstance) {
         }
       } else {
         // Save single response with structured answer
+        console.log(`[CHAT/START] 💾 Entering FAST/REGULAR single-save block`);
+        console.log(`[CHAT/START] 💾 Mode: ${mode}`);
+        console.log(`[CHAT/START] 💾 Will save only PRIMARY response (GEMINI)`);
+        console.log(`[CHAT/START] 💾 Primary shortAnswer: ${result.primary.shortAnswer?.substring(0, 100)}...`);
+        console.log(`[CHAT/START] 💾 Primary steps count: ${result.primary.steps?.length || 0}`);
+        if (result.providers) {
+          console.log(`[CHAT/START] ⚠️  WARNING: result.providers exists with ${result.providers.length} providers, but NOT saving them because mode !== 'EXPERT'`);
+          console.log(`[CHAT/START] ⚠️  This means OpenAI and Claude responses are being IGNORED!`);
+        }
         let structuredAnswer = null;
         let questionType = null;
         let answerFormat = null;
@@ -235,6 +260,12 @@ export async function chatRoutes(server: FastifyInstance) {
           },
         });
       }
+
+      // Log what was actually saved
+      const savedMessagesCount = await prisma.message.count({
+        where: { chatSessionId: session.id, role: 'ASSISTANT' }
+      });
+      console.log(`[CHAT/START] 💾 Total ASSISTANT messages saved in DB: ${savedMessagesCount}`);
       console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ Assistant message(s) saved in ${Date.now() - saveStart}ms`);
 
       // Track usage with token costs
@@ -302,6 +333,13 @@ export async function chatRoutes(server: FastifyInstance) {
         },
       });
       console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ Session data fetched in ${Date.now() - fetchStart}ms`);
+      console.log(`[CHAT/START] 📤 RETURNING TO EXTENSION:`);
+      console.log(`[CHAT/START] 📤   Total messages: ${fullSession?.messages.length || 0}`);
+      console.log(`[CHAT/START] 📤   Messages breakdown:`, fullSession?.messages.map(m => ({
+        role: m.role,
+        provider: m.provider,
+        shortAnswerLength: m.shortAnswer?.length || 0
+      })));
 
       const totalDuration = Date.now() - requestStart;
       console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ SUCCESS - Total request time: ${totalDuration}ms`);
