@@ -5,7 +5,7 @@ import { stripe, PRICE_TO_PLAN } from './billing';
 
 export async function webhookRoutes(server: FastifyInstance) {
   // POST /webhooks/stripe
-  server.post('/stripe', { config: { rawBody: true } }, async (request, reply) => {
+  server.post('/stripe', async (request, reply) => {
     server.log.info('[WEBHOOK-STRIPE] 🔔 Stripe webhook received');
     const sig = request.headers['stripe-signature'];
     if (!sig) {
