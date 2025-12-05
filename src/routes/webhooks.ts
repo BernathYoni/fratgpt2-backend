@@ -121,18 +121,38 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription, serve
   server.log.info(`[WEBHOOK-SUB-CHANGE] ✓ User found: ${user.email} (${user.id})`);
 
   const priceId = subscription.items.data[0]?.price.id;
-  const plan: string = PRICE_TO_PLAN[priceId] || 'FREE';
+  let plan: string = PRICE_TO_PLAN[priceId] || 'FREE';
   const status = mapStripeStatus(subscription.status);
 
   server.log.info(`[WEBHOOK-SUB-CHANGE] Price ID from Stripe: ${priceId}`);
-  server.log.info(`[WEBHOOK-SUB-CHANGE] Mapped plan: ${plan}`);
+  server.log.info(`[WEBHOOK-SUB-CHANGE] Mapped plan (initial): ${plan}`);
   server.log.info(`[WEBHOOK-SUB-CHANGE] Configured Price IDs: ${Object.keys(PRICE_TO_PLAN).join(', ')}`);
 
+  // FAIL-SAFE: If plan is FREE but status is ACTIVE, try to infer from Product Name
   if (plan === 'FREE' && status === 'ACTIVE') {
-    server.log.warn(`[WEBHOOK-SUB-CHANGE] ⚠️ CRITICAL: Subscription is ACTIVE but plan mapped to FREE. Check STRIPE_PRICE_BASIC/PRO env vars.`);
-    server.log.warn(`[WEBHOOK-SUB-CHANGE] Received Price ID: ${priceId}`);
+    server.log.warn(`[WEBHOOK-SUB-CHANGE] ⚠️ Plan mismatch detected. Attempting self-healing via Product Name...`);
+    try {
+      const price = await stripe.prices.retrieve(priceId, { expand: ['product'] });
+      const product = price.product as Stripe.Product;
+      const productName = product.name.toLowerCase();
+      
+      server.log.info(`[WEBHOOK-SUB-CHANGE] Found Product Name: "${product.name}"`);
+
+      if (productName.includes('pro')) {
+        plan = 'PRO';
+        server.log.info(`[WEBHOOK-SUB-CHANGE] ✅ Self-healed plan to PRO`);
+      } else if (productName.includes('basic')) {
+        plan = 'BASIC';
+        server.log.info(`[WEBHOOK-SUB-CHANGE] ✅ Self-healed plan to BASIC`);
+      } else {
+        server.log.error(`[WEBHOOK-SUB-CHANGE] ❌ Could not infer plan from name "${product.name}". Defaulting to FREE.`);
+      }
+    } catch (err: any) {
+      server.log.error(`[WEBHOOK-SUB-CHANGE] ❌ Failed to retrieve product details: ${err.message}`);
+    }
   }
 
+  server.log.info(`[WEBHOOK-SUB-CHANGE] Final Plan: ${plan}`);
   server.log.info(`[WEBHOOK-SUB-CHANGE] Mapped status: ${status}`);
   server.log.info(`[WEBHOOK-SUB-CHANGE] Period end: ${new Date(subscription.current_period_end * 1000).toISOString()}`);
 
