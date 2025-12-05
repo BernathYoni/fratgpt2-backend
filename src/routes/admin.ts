@@ -15,11 +15,15 @@ const userSearchSchema = z.object({
   endDate: z.string().datetime(),
 });
 
+const PLAN_PRICES: Record<string, number> = {
+  FREE: 0,
+  BASIC: 5,
+  PRO: 20,
+};
+
 export async function adminRoutes(server: FastifyInstance) {
   /**
    * GET /admin/financials
-   * Returns cost breakdown by provider and total cost for a given timeframe.
-   * Calculates cost by tracing token amounts from the Usage table.
    */
   server.get('/financials', { preHandler: requireAdmin }, async (request, reply) => {
     try {
@@ -27,7 +31,6 @@ export async function adminRoutes(server: FastifyInstance) {
       const start = new Date(startDate);
       const end = new Date(endDate);
 
-      // Aggregate token usage from the Usage table for 100% accuracy
       const usageAggregation = await prisma.usage.aggregate({
         where: {
           date: {
@@ -48,7 +51,6 @@ export async function adminRoutes(server: FastifyInstance) {
         },
       });
 
-      // Calculate costs using the centralized calculator
       const costs = CostCalculator.calculateTotalCosts({
         geminiFlashInputTokens: usageAggregation._sum.geminiFlashInputTokens || 0,
         geminiFlashOutputTokens: usageAggregation._sum.geminiFlashOutputTokens || 0,
@@ -61,12 +63,10 @@ export async function adminRoutes(server: FastifyInstance) {
         claudeThinkingTokens: usageAggregation._sum.claudeThinkingTokens || 0,
       });
 
-      // Combine Gemini Flash and Pro costs as requested
       const geminiTotalCost = costs.geminiFlash.cost + costs.geminiPro.cost;
       const geminiInputTokens = Number(costs.geminiFlash.inputTokens) + Number(costs.geminiPro.inputTokens);
       const geminiOutputTokens = Number(costs.geminiFlash.outputTokens) + Number(costs.geminiPro.outputTokens);
 
-      // Percentage calculations
       const totalCost = costs.total.cost;
       const geminiPercent = totalCost > 0 ? (geminiTotalCost / totalCost) * 100 : 0;
       const openaiPercent = totalCost > 0 ? (costs.openai.cost / totalCost) * 100 : 0;
@@ -120,7 +120,6 @@ export async function adminRoutes(server: FastifyInstance) {
 
   /**
    * GET /admin/metrics
-   * Returns site-wide usage metrics (solves, snips) for a given timeframe.
    */
   server.get('/metrics', { preHandler: requireAdmin }, async (request, reply) => {
     try {
@@ -128,7 +127,6 @@ export async function adminRoutes(server: FastifyInstance) {
       const start = new Date(startDate);
       const end = new Date(endDate);
 
-      // Count total solves from Usage table
       const usageAggregation = await prisma.usage.aggregate({
         where: {
           date: {
@@ -141,7 +139,6 @@ export async function adminRoutes(server: FastifyInstance) {
         },
       });
 
-      // Count total snips from Attachment table
       const snipCount = await prisma.attachment.count({
         where: {
           source: 'SNIP',
@@ -168,7 +165,6 @@ export async function adminRoutes(server: FastifyInstance) {
 
   /**
    * GET /admin/user-search
-   * Search for a user by email and get their cost breakdown for a timeframe.
    */
   server.get('/user-search', { preHandler: requireAdmin }, async (request, reply) => {
     try {
@@ -189,15 +185,35 @@ export async function adminRoutes(server: FastifyInstance) {
         return reply.code(404).send({ error: 'User not found' });
       }
 
-      // Process subscription history
+      // 1. Calculate Revenue for the selected period
+      let estimatedRevenue = 0;
+      const ONE_DAY_MS = 1000 * 60 * 60 * 24;
+
+      // Process subscription history & Revenue
       const subscriptionHistory = user.subscriptions.map(sub => {
-        const startDate = new Date(sub.createdAt);
-        const endDate = sub.status === 'CANCELED' ? new Date(sub.updatedAt) : new Date();
+        const subStart = new Date(sub.createdAt);
+        const subEnd = sub.status === 'CANCELED' ? new Date(sub.updatedAt) : new Date();
         
-        // Calculate duration in months (rough approximation)
-        const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-        const months = (diffDays / 30).toFixed(1);
+        // Intersection of [subStart, subEnd] and [queryStart, queryEnd] for revenue calculation
+        // We use 'end' (query end date) as the max boundary for calculation, assuming ACTIVE means active until now/query end.
+        // If sub is ACTIVE, effective end date for calculation is the query end date (or now).
+        let effectiveSubEnd = sub.status === 'CANCELED' || sub.status === 'PAST_DUE' ? new Date(sub.updatedAt) : new Date();
+        
+        // Revenue overlap calculation
+        const overlapStart = new Date(Math.max(subStart.getTime(), start.getTime()));
+        const overlapEnd = new Date(Math.min(effectiveSubEnd.getTime(), end.getTime()));
+
+        if (overlapStart < overlapEnd) {
+          const daysOverlap = (overlapEnd.getTime() - overlapStart.getTime()) / ONE_DAY_MS;
+          const monthlyPrice = PLAN_PRICES[sub.plan] || 0;
+          // Revenue = (Days / 30) * MonthlyPrice
+          estimatedRevenue += (daysOverlap / 30) * monthlyPrice;
+        }
+
+        // Duration for display (Total duration of the sub, not just overlap)
+        const totalDiffTime = Math.abs(subEnd.getTime() - subStart.getTime());
+        const totalDiffDays = Math.ceil(totalDiffTime / ONE_DAY_MS);
+        const months = (totalDiffDays / 30).toFixed(1);
 
         return {
           plan: sub.plan,
@@ -242,15 +258,16 @@ export async function adminRoutes(server: FastifyInstance) {
         claudeThinkingTokens: usageAggregation._sum.claudeThinkingTokens || 0,
       });
 
-       // Combine Gemini Flash and Pro costs
       const geminiTotalCost = costs.geminiFlash.cost + costs.geminiPro.cost;
-      
-      // Percentages for this user
       const totalCost = costs.total.cost;
+      
       const geminiPercent = totalCost > 0 ? (geminiTotalCost / totalCost) * 100 : 0;
       const openaiPercent = totalCost > 0 ? (costs.openai.cost / totalCost) * 100 : 0;
       const claudePercent = totalCost > 0 ? (costs.claude.cost / totalCost) * 100 : 0;
 
+      // 2. Calculate Cost Percentage of Revenue
+      // avoid division by zero
+      const costToRevenuePercentage = estimatedRevenue > 0 ? (totalCost / estimatedRevenue) * 100 : (totalCost > 0 ? 9999 : 0);
 
       return reply.send({
         user: {
@@ -260,6 +277,8 @@ export async function adminRoutes(server: FastifyInstance) {
           subscriptionHistory,
         },
         totalCost,
+        estimatedRevenue,
+        costToRevenuePercentage,
         providers: {
            gemini: {
             cost: geminiTotalCost,
@@ -287,7 +306,6 @@ export async function adminRoutes(server: FastifyInstance) {
 
   /**
    * POST /admin/reset-stats
-   * Reset all Usage and AdminStats data (for testing)
    */
   server.post('/reset-stats', { preHandler: requireAdmin }, async (request, reply) => {
     const userEmail = (request as any).user?.email || 'unknown';
@@ -295,11 +313,9 @@ export async function adminRoutes(server: FastifyInstance) {
       console.log(`[ADMIN/RESET] Request received from ${userEmail}`);
       console.log('[ADMIN/RESET] Resetting all stats data...');
 
-      // Delete all AdminStats records
       const deletedAdminStats = await prisma.adminStats.deleteMany({});
       console.log(`[ADMIN/RESET] Deleted ${deletedAdminStats.count} AdminStats records`);
 
-      // Delete all Usage records
       const deletedUsage = await prisma.usage.deleteMany({});
       console.log(`[ADMIN/RESET] Deleted ${deletedUsage.count} Usage records`);
 
