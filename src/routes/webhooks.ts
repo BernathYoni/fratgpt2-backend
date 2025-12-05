@@ -121,11 +121,18 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription, serve
   server.log.info(`[WEBHOOK-SUB-CHANGE] ✓ User found: ${user.email} (${user.id})`);
 
   const priceId = subscription.items.data[0]?.price.id;
-  const plan = PRICE_TO_PLAN[priceId] || 'FREE';
+  const plan: string = PRICE_TO_PLAN[priceId] || 'FREE';
   const status = mapStripeStatus(subscription.status);
 
-  server.log.info(`[WEBHOOK-SUB-CHANGE] Price ID: ${priceId}`);
+  server.log.info(`[WEBHOOK-SUB-CHANGE] Price ID from Stripe: ${priceId}`);
   server.log.info(`[WEBHOOK-SUB-CHANGE] Mapped plan: ${plan}`);
+  server.log.info(`[WEBHOOK-SUB-CHANGE] Configured Price IDs: ${Object.keys(PRICE_TO_PLAN).join(', ')}`);
+
+  if (plan === 'FREE' && status === 'ACTIVE') {
+    server.log.warn(`[WEBHOOK-SUB-CHANGE] ⚠️ CRITICAL: Subscription is ACTIVE but plan mapped to FREE. Check STRIPE_PRICE_BASIC/PRO env vars.`);
+    server.log.warn(`[WEBHOOK-SUB-CHANGE] Received Price ID: ${priceId}`);
+  }
+
   server.log.info(`[WEBHOOK-SUB-CHANGE] Mapped status: ${status}`);
   server.log.info(`[WEBHOOK-SUB-CHANGE] Period end: ${new Date(subscription.current_period_end * 1000).toISOString()}`);
 
@@ -136,13 +143,13 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription, serve
       userId: user.id,
       stripeSubscriptionId: subscription.id,
       stripePriceId: priceId,
-      plan,
+      plan: plan as any,
       status,
       currentPeriodEnd: new Date(subscription.current_period_end * 1000),
     },
     update: {
       stripePriceId: priceId,
-      plan,
+      plan: plan as any,
       status,
       currentPeriodEnd: new Date(subscription.current_period_end * 1000),
     },
