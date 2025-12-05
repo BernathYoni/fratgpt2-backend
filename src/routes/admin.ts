@@ -266,7 +266,9 @@ export async function adminRoutes(server: FastifyInstance) {
    * Reset all Usage and AdminStats data (for testing)
    */
   server.post('/reset-stats', { preHandler: requireAdmin }, async (request, reply) => {
+    const userEmail = (request as any).user?.email || 'unknown';
     try {
+      console.log(`[ADMIN/RESET] Request received from ${userEmail}`);
       console.log('[ADMIN/RESET] Resetting all stats data...');
 
       // Delete all AdminStats records
@@ -277,14 +279,17 @@ export async function adminRoutes(server: FastifyInstance) {
       const deletedUsage = await prisma.usage.deleteMany({});
       console.log(`[ADMIN/RESET] Deleted ${deletedUsage.count} Usage records`);
 
+      console.log(`[ADMIN/RESET] Success. Stats wiped by ${userEmail}`);
+
       return reply.send({
         success: true,
         deletedAdminStats: deletedAdminStats.count,
         deletedUsage: deletedUsage.count,
       });
     } catch (error) {
+      console.error(`[ADMIN/RESET] FAILED for user ${userEmail}:`, error);
       server.log.error(error);
-      return reply.code(500).send({ error: 'Internal server error' });
+      return reply.code(500).send({ error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 }
