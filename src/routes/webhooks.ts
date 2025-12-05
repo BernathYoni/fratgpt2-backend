@@ -161,7 +161,12 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription, serve
 
   server.log.info(`[WEBHOOK-SUB-CHANGE] Final Plan: ${plan}`);
   server.log.info(`[WEBHOOK-SUB-CHANGE] Mapped status: ${status}`);
-  server.log.info(`[WEBHOOK-SUB-CHANGE] Period end: ${new Date(subscription.current_period_end * 1000).toISOString()}`);
+  
+  const periodEnd = subscription.current_period_end 
+    ? new Date(subscription.current_period_end * 1000) 
+    : new Date(); // Default to now if missing
+
+  server.log.info(`[WEBHOOK-SUB-CHANGE] Period end: ${periodEnd.toISOString()}`);
 
   // Upsert subscription
   const result = await prisma.subscription.upsert({
@@ -172,13 +177,13 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription, serve
       stripePriceId: priceId,
       plan: plan as any,
       status,
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+      currentPeriodEnd: periodEnd,
     },
     update: {
       stripePriceId: priceId,
       plan: plan as any,
       status,
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+      currentPeriodEnd: periodEnd,
     },
   });
 
