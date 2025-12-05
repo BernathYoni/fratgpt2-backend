@@ -178,12 +178,35 @@ export async function adminRoutes(server: FastifyInstance) {
 
       const user = await prisma.user.findUnique({
         where: { email },
-        select: { id: true, email: true, createdAt: true }
+        include: {
+          subscriptions: {
+            orderBy: { createdAt: 'desc' }
+          }
+        }
       });
 
       if (!user) {
         return reply.code(404).send({ error: 'User not found' });
       }
+
+      // Process subscription history
+      const subscriptionHistory = user.subscriptions.map(sub => {
+        const startDate = new Date(sub.createdAt);
+        const endDate = sub.status === 'CANCELED' ? new Date(sub.updatedAt) : new Date();
+        
+        // Calculate duration in months (rough approximation)
+        const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+        const months = (diffDays / 30).toFixed(1);
+
+        return {
+          plan: sub.plan,
+          status: sub.status,
+          startDate: sub.createdAt,
+          endDate: sub.status === 'CANCELED' ? sub.updatedAt : null,
+          durationMonths: months
+        };
+      });
 
       // Aggregate usage for this specific user
       const usageAggregation = await prisma.usage.aggregate({
@@ -234,6 +257,7 @@ export async function adminRoutes(server: FastifyInstance) {
           id: user.id,
           email: user.email,
           createdAt: user.createdAt,
+          subscriptionHistory,
         },
         totalCost,
         providers: {
