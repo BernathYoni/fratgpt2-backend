@@ -14,6 +14,18 @@ const server = Fastify({
   bodyLimit: 10485760, // 10MB for images
 });
 
+// Global content type parser to keep raw body for Stripe
+server.addContentTypeParser('application/json', { parseAs: 'buffer' }, (req, body, done) => {
+  try {
+    const json = JSON.parse(body.toString());
+    (req as any).rawBody = body; // Attach raw buffer for Stripe verification
+    done(null, json);
+  } catch (err: any) {
+    err.statusCode = 400;
+    done(err, undefined);
+  }
+});
+
 async function start() {
   try {
     // Register plugins

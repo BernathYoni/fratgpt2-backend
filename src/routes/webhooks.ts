@@ -4,12 +4,6 @@ import { prisma } from '../db/client';
 import { stripe, PRICE_TO_PLAN } from './billing';
 
 export async function webhookRoutes(server: FastifyInstance) {
-  // Configure Fastify to keep the raw body for Stripe signature verification
-  // This overrides the default JSON parser for routes in this plugin context only
-  server.addContentTypeParser('application/json', { parseAs: 'buffer' }, (req, body, done) => {
-    done(null, body);
-  });
-
   // POST /webhooks/stripe
   server.post('/stripe', async (request, reply) => {
     server.log.info('[WEBHOOK-STRIPE] 🔔 Stripe webhook received');
@@ -22,8 +16,15 @@ export async function webhookRoutes(server: FastifyInstance) {
     let event: Stripe.Event;
 
     try {
+      // Use the rawBody buffer attached by the global parser in server.ts
+      const rawBody = (request as any).rawBody;
+      
+      if (!rawBody) {
+        throw new Error('Raw body not found');
+      }
+
       event = stripe.webhooks.constructEvent(
-        request.body as any,
+        rawBody,
         sig,
         process.env.STRIPE_WEBHOOK_SECRET || ''
       );
