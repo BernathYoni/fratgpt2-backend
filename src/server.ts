@@ -2,6 +2,8 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const rawBody = require('fastify-raw-body');
 import { authRoutes } from './routes/auth';
 import { chatRoutes } from './routes/chat';
 import { billingRoutes } from './routes/billing';
@@ -14,18 +16,6 @@ const server = Fastify({
   bodyLimit: 10485760, // 10MB for images
 });
 
-// Global content type parser to keep raw body for Stripe
-server.addContentTypeParser('application/json', { parseAs: 'buffer' }, (req, body, done) => {
-  try {
-    const json = JSON.parse(body.toString());
-    (req as any).rawBody = body; // Attach raw buffer for Stripe verification
-    done(null, json);
-  } catch (err: any) {
-    err.statusCode = 400;
-    done(err, undefined);
-  }
-});
-
 async function start() {
   try {
     // Register plugins
@@ -35,6 +25,16 @@ async function start() {
         /^chrome-extension:\/\//,
       ],
       credentials: true,
+    });
+
+    // Register raw-body plugin for Stripe webhooks
+    // global: false means we must enable it specifically in the webhook route config
+    // encoding: false means rawBody will be a Buffer (required for Stripe)
+    await server.register(rawBody, {
+      field: 'rawBody',
+      global: false,
+      encoding: false,
+      runFirst: true,
     });
 
     await server.register(jwt, {
