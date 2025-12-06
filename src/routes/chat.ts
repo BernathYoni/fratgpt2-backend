@@ -34,6 +34,10 @@ export async function chatRoutes(server: FastifyInstance) {
     const requestStart = Date.now();
     console.log('\n' + '='.repeat(80));
     console.log(`[CHAT/START] [${new Date().toISOString()}] 🚀 New chat request received`);
+    console.log('[CHAT/START] 📦 RAW BODY:', JSON.stringify(request.body, (key, value) => {
+      if (key === 'imageData') return '[BASE64_IMAGE_DATA]'; // Don't log massive image strings
+      return value;
+    }, 2));
 
     try {
       const authStart = Date.now();

@@ -44,6 +44,7 @@ export class GeminiProvider implements LLMProvider {
     const parts: any[] = [];
 
     // Select system prompt based on v2 flag
+    console.log(`[GEMINI] [${requestId}] 📝 System Prompt Selected: ${options?.v2 ? 'V2 (Structured)' : 'V1 (Legacy)'}`);
     let systemPromptContent: string;
     if (options?.v2) {
       systemPromptContent = SYSTEM_PROMPT_V2;
