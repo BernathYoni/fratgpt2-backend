@@ -252,11 +252,13 @@ export async function chatRoutes(server: FastifyInstance) {
           // Not structured JSON, use legacy format
         }
 
+        const debug_raw_answer = result.primary.debug_raw_answer;
+
         await prisma.message.create({
           data: {
             chatSessionId: session.id,
             role: 'ASSISTANT',
-            content: JSON.stringify({ steps: result.primary.steps }),
+            content: debug_raw_answer || result.primary.shortAnswer || 'No answer',
             shortAnswer: result.primary.shortAnswer,
             provider: mode === 'FAST' ? 'GEMINI' : 'GEMINI',
             questionType,
@@ -515,6 +517,8 @@ export async function chatRoutes(server: FastifyInstance) {
         } catch {
           // Not structured JSON, use legacy format
         }
+
+        const debug_raw_answer = result.primary.debug_raw_answer;
 
         await prisma.message.create({
           data: {
