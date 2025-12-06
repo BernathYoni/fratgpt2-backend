@@ -35,7 +35,7 @@ export type AnswerType = 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'FILL_IN_THE_BLANK' 
 // Enhanced LLM response with metadata
 export interface LLMResponse {
   shortAnswer: string;
-  steps: string[];
+  steps?: string[]; // Made optional
   tokensUsed?: number; // Deprecated: use tokenUsage instead
 
   // V2 Structured Data
