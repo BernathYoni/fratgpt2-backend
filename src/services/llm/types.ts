@@ -29,17 +29,30 @@ export interface TokenUsage {
   thinkingTokens?: number; // Claude-specific: extended thinking tokens
 }
 
+// Answer Types for V2
+export type AnswerType = 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'FILL_IN_THE_BLANK' | 'SHORT_ANSWER' | 'CODING' | 'UNKNOWN';
+
 // Enhanced LLM response with metadata
 export interface LLMResponse {
   shortAnswer: string;
   steps: string[];
   tokensUsed?: number; // Deprecated: use tokenUsage instead
 
+  // V2 Structured Data
+  type?: AnswerType;
+  content?: {
+    choice?: string;
+    value?: boolean;
+    text?: string;
+    code?: string;
+  };
+  debug_raw_answer?: string;
+
   // Token usage details
   tokenUsage?: TokenUsage;
 
   // Parse metadata
-  confidence?: ParseConfidence;
+  confidence?: ParseConfidence | number;
   parseMethod?: string;
   parseAttempts?: ParseAttempt[];
   warnings?: string[];
@@ -58,6 +71,7 @@ export interface LLMOptions {
   systemPrompt?: string;
   requestId?: string; // For tracking parallel requests in EXPERT mode
   mode?: 'FAST' | 'REGULAR' | 'EXPERT'; // To help providers select the right model
+  v2?: boolean; // Feature flag for V2 redesign
 }
 
 // Parser configuration

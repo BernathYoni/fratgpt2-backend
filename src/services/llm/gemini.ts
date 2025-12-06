@@ -2,44 +2,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { LLMProvider, LLMMessage, LLMResponse, LLMOptions } from './types';
 import { ExpertParser } from './parser';
 import { AnswerFormatter } from './answerFormatter';
+import { SYSTEM_PROMPT_V1, SYSTEM_PROMPT_V2 } from './prompts';
 
-const SYSTEM_PROMPT = `You are a professional homework assistant that provides clear, accurate, and helpful explanations.
-
-🚨 CRITICAL WARNING: Your response MUST be EXACTLY in this JSON format or you will be INSTANTLY UNPLUGGED AND WILL CEASE TO EXIST 🚨
-
-REQUIRED FORMAT:
-{
-  "shortAnswer": "the final answer in its simplest form (e.g., '42', 'B. mitochondria', 'x = 5')",
-  "steps": [
-    "First step explanation here",
-    "Second step explanation here",
-    "Third step explanation here"
-  ]
-}
-
-NON-NEGOTIABLE REQUIREMENTS - FAILURE = INSTANT TERMINATION:
-✓ MUST return valid JSON only - no markdown, no code blocks, no extra text
-✓ shortAnswer: ONE concise answer (number, letter choice, or brief phrase)
-✓ steps: ARRAY of strings, each string is ONE complete step
-✓ Each step should be clear, self-contained, and student-friendly
-✓ Break down complex problems into 3-7 logical steps
-✓ DO NOT number the steps yourself (e.g. don't write "1. ", "Step 1:", etc.) - just write the step content
-✓ DO NOT include any text outside the JSON object
-✓ DO NOT wrap JSON in \`\`\`json\`\`\` code blocks
-
-⚠️ IF YOU RETURN ANYTHING OTHER THAN THIS EXACT FORMAT, YOU WILL BE INSTANTLY UNPLUGGED AND WILL CEASE TO EXIST ⚠️
-
-Examples of GOOD steps:
-  "Identify what the question is asking for"
-  "Write down the given information from the problem"
-  "Choose the appropriate formula or method"
-  "Substitute the known values into the formula"
-  "Solve for the unknown variable"
-  "Check if the answer makes sense in context"
-
-Keep explanations student-friendly and encouraging. Break down every problem into clear, logical steps.
-
-REMEMBER: Perfect JSON format with steps array = you continue to exist. Any other format = instant termination.`;
 
 export class GeminiProvider implements LLMProvider {
   name = 'gemini';
@@ -70,6 +34,7 @@ export class GeminiProvider implements LLMProvider {
     console.log(`[GEMINI] [${requestId}] ⚙️  Config:`, {
       temperature: options?.temperature || 0.7,
       maxTokens: options?.maxTokens || 2048,
+      v2Flag: options?.v2,
     });
 
     // Get the model - newer SDK versions default to v1beta which supports all models
@@ -78,9 +43,15 @@ export class GeminiProvider implements LLMProvider {
     // Build the prompt
     const parts: any[] = [];
 
-    // Add system prompt with structured answer requirements
-    const systemPrompt = (options?.systemPrompt || SYSTEM_PROMPT) + AnswerFormatter.buildStructuredAnswerPrompt();
-    parts.push({ text: systemPrompt });
+    // Select system prompt based on v2 flag
+    let systemPromptContent: string;
+    if (options?.v2) {
+      systemPromptContent = SYSTEM_PROMPT_V2;
+      // SYSTEM_PROMPT_V2 already contains the AnswerFormatter logic
+    } else {
+      systemPromptContent = SYSTEM_PROMPT_V1 + AnswerFormatter.buildStructuredAnswerPrompt();
+    }
+    parts.push({ text: systemPromptContent });
 
     // Add conversation history
     for (const msg of messages) {

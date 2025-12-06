@@ -1,8 +1,8 @@
-import { LLMResponse, ParseConfidence, ParseAttempt, ParserOptions } from './types';
+import { LLMResponse, ParseConfidence, ParseAttempt, ParserOptions, AnswerType } from './types';
 
 /**
  * Expert-level multi-stage parser for LLM responses with performance timing
- * Implements 6 parsing strategies with graceful degradation
+ * Implements various parsing strategies with graceful degradation
  */
 export class ExpertParser {
   private config: Required<ParserOptions>;
@@ -26,76 +26,37 @@ export class ExpertParser {
 
     console.log(`[PARSER:${providerName.toUpperCase()}] 🔍 Starting multi-stage parse`);
     console.log(`[PARSER:${providerName.toUpperCase()}] Raw response length: ${rawResponse.length}`);
-    console.log(`[PARSER:${providerName.toUpperCase()}] Raw response type: ${typeof rawResponse}`);
 
     // STAGE 0: Check for empty response
     if (!rawResponse || rawResponse.trim().length === 0) {
-      console.error(`[PARSER:${providerName.toUpperCase()}] ❌❌❌ EMPTY RESPONSE DETECTED ❌❌❌`);
-      console.error(`[PARSER:${providerName.toUpperCase()}] rawResponse value: "${rawResponse}"`);
-      console.error(`[PARSER:${providerName.toUpperCase()}] rawResponse type: ${typeof rawResponse}`);
-      console.error(`[PARSER:${providerName.toUpperCase()}] rawResponse is null: ${rawResponse === null}`);
-      console.error(`[PARSER:${providerName.toUpperCase()}] rawResponse is undefined: ${rawResponse === undefined}`);
-      console.error(`[PARSER:${providerName.toUpperCase()}] rawResponse length: ${rawResponse?.length ?? 'N/A'}`);
-      console.error(`[PARSER:${providerName.toUpperCase()}] ⚠️  POSSIBLE CAUSES:`);
-      console.error(`[PARSER:${providerName.toUpperCase()}]    1. API quota/rate limit exceeded`);
-      console.error(`[PARSER:${providerName.toUpperCase()}]    2. Content policy violation (safety filter)`);
-      console.error(`[PARSER:${providerName.toUpperCase()}]    3. Image too large or corrupted`);
-      console.error(`[PARSER:${providerName.toUpperCase()}]    4. API key invalid or expired`);
-      console.error(`[PARSER:${providerName.toUpperCase()}]    5. Network timeout during generation`);
-      console.error(`[PARSER:${providerName.toUpperCase()}]    6. Provider API error (check logs above)`);
       return this.createErrorResponse('EMPTY_RESPONSE', 'The AI returned an empty response', attempts);
     }
 
-    // STAGE 1: Direct JSON parse
-    let stageStart = Date.now();
-    const directAttempt = this.attemptDirectParse(rawResponse);
-    attempts.push(directAttempt);
-    console.log(`[PARSER:${providerName.toUpperCase()}] ⏱️  Stage 1 (direct parse): ${Date.now() - stageStart}ms`);
-    if (directAttempt.success) {
-      const totalTime = Date.now() - parseStartTime;
-      console.log(`[PARSER:${providerName.toUpperCase()}] ✅ SUCCESS via direct parse (${totalTime}ms total)`);
-      return this.finalizeResponse(directAttempt.result, ParseConfidence.HIGH, 'direct_json', attempts);
+    // Attempt parsing through various strategies
+    const strategies = [
+      this.attemptDirectParse.bind(this),
+      this.attemptCleanupParse.bind(this),
+      this.attemptRegexExtraction.bind(this),
+    ];
+
+    for (const strategy of strategies) {
+      const stageStart = Date.now();
+      const attempt = strategy(rawResponse);
+      attempts.push(attempt);
+      console.log(`[PARSER:${providerName.toUpperCase()}] ⏱️  Stage (${attempt.method}): ${Date.now() - stageStart}ms`);
+      if (attempt.success) {
+        const totalTime = Date.now() - parseStartTime;
+        console.log(`[PARSER:${providerName.toUpperCase()}] ✅ SUCCESS via ${attempt.method} (${totalTime}ms total)`);
+        return this.finalizeResponse(attempt.result, ParseConfidence.HIGH, attempt.method, attempts);
+      }
     }
 
-    // STAGE 2: Regex extraction
-    stageStart = Date.now();
-    const regexAttempt = this.attemptRegexExtraction(rawResponse);
-    attempts.push(regexAttempt);
-    console.log(`[PARSER:${providerName.toUpperCase()}] ⏱️  Stage 2 (regex): ${Date.now() - stageStart}ms`);
-    if (regexAttempt.success) {
-      const totalTime = Date.now() - parseStartTime;
-      console.log(`[PARSER:${providerName.toUpperCase()}] ✅ SUCCESS via regex extraction (${totalTime}ms total)`);
-      return this.finalizeResponse(regexAttempt.result, ParseConfidence.HIGH, 'regex', attempts);
-    }
-
-    // STAGE 3: Cleanup and retry
-    stageStart = Date.now();
-    const cleanupAttempt = this.attemptCleanupParse(rawResponse);
-    attempts.push(cleanupAttempt);
-    console.log(`[PARSER:${providerName.toUpperCase()}] ⏱️  Stage 3 (cleanup): ${Date.now() - stageStart}ms`);
-    if (cleanupAttempt.success) {
-      const totalTime = Date.now() - parseStartTime;
-      console.log(`[PARSER:${providerName.toUpperCase()}] ✅ SUCCESS via cleanup parse (${totalTime}ms total)`);
-      return this.finalizeResponse(cleanupAttempt.result, ParseConfidence.MEDIUM, 'cleanup', attempts);
-    }
-
-    // STAGE 4: Aggressive extraction
-    stageStart = Date.now();
-    const aggressiveAttempt = this.attemptAggressiveExtraction(rawResponse);
-    attempts.push(aggressiveAttempt);
-    console.log(`[PARSER:${providerName.toUpperCase()}] ⏱️  Stage 4 (aggressive): ${Date.now() - stageStart}ms`);
-    if (aggressiveAttempt.success) {
-      const totalTime = Date.now() - parseStartTime;
-      console.log(`[PARSER:${providerName.toUpperCase()}] ✅ SUCCESS via aggressive extraction (${totalTime}ms total)`);
-      return this.finalizeResponse(aggressiveAttempt.result, ParseConfidence.MEDIUM, 'aggressive', attempts);
-    }
-
-    // STAGE 5: Partial extraction (if enabled)
+    // STAGE Fallback: Partial extraction (if enabled and all other strategies failed)
     if (this.config.fallbackToPartial) {
-      stageStart = Date.now();
+      const stageStart = Date.now();
       const partialAttempt = this.attemptPartialExtraction(rawResponse);
       attempts.push(partialAttempt);
-      console.log(`[PARSER:${providerName.toUpperCase()}] ⏱️  Stage 5 (partial): ${Date.now() - stageStart}ms`);
+      console.log(`[PARSER:${providerName.toUpperCase()}] ⏱️  Stage (partial): ${Date.now() - stageStart}ms`);
       if (partialAttempt.success) {
         const totalTime = Date.now() - parseStartTime;
         console.warn(`[PARSER:${providerName.toUpperCase()}] ⚠️  PARTIAL SUCCESS via extraction (${totalTime}ms total)`);
@@ -103,232 +64,118 @@ export class ExpertParser {
       }
     }
 
-    // STAGE 6: All parsing failed - return structured error
+    // All parsing failed - return structured error
     const totalTime = Date.now() - parseStartTime;
     console.error(`[PARSER:${providerName.toUpperCase()}] ❌ All parsing strategies failed (${totalTime}ms wasted)`);
     return this.createErrorResponse('PARSE_FAILED', 'Could not parse AI response after multiple attempts', attempts);
   }
 
   /**
-   * STRATEGY 1: Direct JSON.parse()
+   * Strategy: Direct JSON.parse()
    */
   private attemptDirectParse(text: string): ParseAttempt {
     try {
       const parsed = JSON.parse(text);
-      const validation = this.validateResponse(parsed);
-
-      if (validation.valid || !this.config.strictValidation) {
-        return {
-          method: 'direct_json',
-          success: true,
-          result: this.coerceToValidFormat(parsed, validation.warnings),
-          timestamp: new Date(),
-        };
-      }
-
-      return {
-        method: 'direct_json',
-        success: false,
-        error: `Validation failed: ${validation.warnings.join(', ')}`,
-        timestamp: new Date(),
-      };
+      return this.processParsedJson(parsed, 'direct_json');
     } catch (error: any) {
-      return {
-        method: 'direct_json',
-        success: false,
-        error: error.message,
-        timestamp: new Date(),
-      };
+      return { method: 'direct_json', success: false, error: error.message, timestamp: new Date() };
     }
   }
 
   /**
-   * STRATEGY 2: Regex extraction - find first {...}
-   */
-  private attemptRegexExtraction(text: string): ParseAttempt {
-    try {
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        return {
-          method: 'regex',
-          success: false,
-          error: 'No JSON object found in response',
-          timestamp: new Date(),
-        };
-      }
-
-      const parsed = JSON.parse(jsonMatch[0]);
-      const validation = this.validateResponse(parsed);
-
-      if (validation.valid || !this.config.strictValidation) {
-        return {
-          method: 'regex',
-          success: true,
-          result: this.coerceToValidFormat(parsed, validation.warnings),
-          timestamp: new Date(),
-        };
-      }
-
-      return {
-        method: 'regex',
-        success: false,
-        error: `Validation failed: ${validation.warnings.join(', ')}`,
-        timestamp: new Date(),
-      };
-    } catch (error: any) {
-      return {
-        method: 'regex',
-        success: false,
-        error: error.message,
-        timestamp: new Date(),
-      };
-    }
-  }
-
-  /**
-   * STRATEGY 3: Cleanup text and retry
+   * Strategy: Cleanup text and retry
    */
   private attemptCleanupParse(text: string): ParseAttempt {
     try {
-      let cleaned = text;
-
-      // Remove markdown code blocks
-      cleaned = this.removeMarkdownCodeBlocks(cleaned);
-
-      // Fix common JSON issues
+      let cleaned = this.removeMarkdownCodeBlocks(text);
       cleaned = this.fixCommonJSONIssues(cleaned);
-
-      // Extract JSON substring
       const extracted = this.extractJSONSubstring(cleaned);
+      
       if (!extracted) {
-        return {
-          method: 'cleanup',
-          success: false,
-          error: 'Could not extract JSON after cleanup',
-          timestamp: new Date(),
-        };
+        return { method: 'cleanup', success: false, error: 'Could not extract JSON after cleanup', timestamp: new Date() };
       }
 
       const parsed = JSON.parse(extracted);
-      const validation = this.validateResponse(parsed);
-
-      if (validation.valid || !this.config.strictValidation) {
-        const warnings = ['Applied text cleanup and fixes', ...validation.warnings];
-        return {
-          method: 'cleanup',
-          success: true,
-          result: this.coerceToValidFormat(parsed, warnings),
-          timestamp: new Date(),
-        };
-      }
-
-      return {
-        method: 'cleanup',
-        success: false,
-        error: `Validation failed: ${validation.warnings.join(', ')}`,
-        timestamp: new Date(),
-      };
+      return this.processParsedJson(parsed, 'cleanup', ['Applied text cleanup']);
     } catch (error: any) {
-      return {
-        method: 'cleanup',
-        success: false,
-        error: error.message,
-        timestamp: new Date(),
-      };
+      return { method: 'cleanup', success: false, error: error.message, timestamp: new Date() };
     }
   }
 
   /**
-   * STRATEGY 4: Aggressive extraction - try multiple patterns
+   * Strategy: Regex extraction - find first {...}
    */
-  private attemptAggressiveExtraction(text: string): ParseAttempt {
-    const patterns = [
-      /\{[\s\S]*?"shortAnswer"[\s\S]*?"steps"[\s\S]*?\}/,  // Find JSON with both required fields
-      /\{[\s\S]*?"steps"[\s\S]*?"shortAnswer"[\s\S]*?\}/,  // Reverse order
-      /\{[^}]*"shortAnswer"[^}]*\}/,                        // Just shortAnswer
-    ];
-
-    for (const pattern of patterns) {
-      try {
-        const match = text.match(pattern);
-        if (match) {
-          const parsed = JSON.parse(match[0]);
-          const validation = this.validateResponse(parsed);
-
-          if (validation.valid || !this.config.strictValidation) {
-            const warnings = ['Used aggressive pattern matching', ...validation.warnings];
-            return {
-              method: 'aggressive',
-              success: true,
-              result: this.coerceToValidFormat(parsed, warnings),
-              timestamp: new Date(),
-            };
-          }
-        }
-      } catch {
-        continue;
+  private attemptRegexExtraction(text: string): ParseAttempt {
+    try {
+      // Prioritize extracting a valid JSON object
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        return { method: 'regex', success: false, error: 'No JSON object found in response', timestamp: new Date() };
       }
+      const parsed = JSON.parse(jsonMatch[0]);
+      return this.processParsedJson(parsed, 'regex');
+    } catch (error: any) {
+      return { method: 'regex', success: false, error: error.message, timestamp: new Date() };
     }
-
-    return {
-      method: 'aggressive',
-      success: false,
-      error: 'No valid JSON found with any pattern',
-      timestamp: new Date(),
-    };
   }
 
   /**
-   * STRATEGY 5: Partial extraction - extract what we can
+   * Strategy: Partial extraction (V1 fallback logic for now)
+   * This is a last resort to get some information out.
    */
   private attemptPartialExtraction(text: string): ParseAttempt {
     const warnings: string[] = [];
     let shortAnswer: string | undefined;
     let steps: string[] | undefined;
+    let type: AnswerType = 'UNKNOWN';
+    let content: any = { text: 'Unable to extract content' };
 
-    // Try to extract shortAnswer
-    const shortAnswerPatterns = [
-      /"shortAnswer"\s*:\s*"([^"]*)"/,
-      /"answer"\s*:\s*"([^"]*)"/,
-      /"result"\s*:\s*"([^"]*)"/,
-    ];
-
-    for (const pattern of shortAnswerPatterns) {
-      const match = text.match(pattern);
-      if (match) {
-        shortAnswer = match[1];
-        warnings.push('Extracted shortAnswer from malformed JSON');
-        break;
-      }
+    // Try to extract V2 type and content first
+    const typeMatch = text.match(/"type"\s*:\s*"([^"]*)"/);
+    if (typeMatch) {
+      type = typeMatch[1] as AnswerType;
+      warnings.push(`Extracted type: ${type}`);
+    }
+    const contentMatch = text.match(/"content"\s*:\s*(\{[\s\S]*?\})/);
+    if (contentMatch) {
+      try {
+        content = JSON.parse(contentMatch[1]);
+        warnings.push('Extracted content object');
+      } catch {/* ignore */}
     }
 
+    // Try to extract V1 shortAnswer if V2 content is not strong
+    if (!content.text && !content.choice && !content.value && !content.code) {
+        const shortAnswerPatterns = ["shortAnswer"\s*:\s*"([^"]*)", /"answer"\s*:\s*"([^"]*)"/];
+        for (const pattern of shortAnswerPatterns) {
+          const match = text.match(pattern);
+          if (match) {
+            shortAnswer = match[1];
+            warnings.push('Extracted shortAnswer via regex');
+            break;
+          }
+        }
+    }
+    
     // Try to extract steps array
     const stepsMatch = text.match(/"steps"\s*:\s*\[([\s\S]*?)\]/);
     if (stepsMatch) {
       try {
         const stepsText = stepsMatch[1];
-        steps = stepsText
-          .split(',')
-          .map((s: string) => s.trim().replace(/^["']|["']$/g, ''))
-          .filter((s: string) => s.length > 0 && s !== 'null' && s !== 'undefined');
-
-        if (steps.length > 0) {
-          warnings.push('Extracted steps from malformed JSON');
-        } else {
-          steps = undefined;
-        }
-      } catch {
-        steps = undefined;
-      }
+        steps = stepsText.split(',').map(s => s.trim().replace(/^["']|["']$/g, '')).filter(s => s.length > 0);
+        if (steps.length > 0) warnings.push('Extracted steps via regex');
+      } catch { /* ignore */ }
     }
 
-    // Check if we got anything useful
-    if (shortAnswer || steps) {
+    // If we got anything useful
+    if (type !== 'UNKNOWN' || shortAnswer || steps) {
       return {
         method: 'partial',
         success: true,
         result: {
-          shortAnswer: shortAnswer || 'Unable to extract answer',
+          type: type,
+          content: content,
+          shortAnswer: shortAnswer || this.getV2ShortAnswer(type, content), // Fallback to getV2ShortAnswer
           steps: steps || ['Unable to extract detailed steps'],
           warnings,
           partialFailure: true,
@@ -337,113 +184,114 @@ export class ExpertParser {
       };
     }
 
-    return {
-      method: 'partial',
-      success: false,
-      error: 'Could not extract any valid data',
-      timestamp: new Date(),
-    };
+    return { method: 'partial', success: false, error: 'Could not extract any valid data', timestamp: new Date() };
   }
 
   /**
-   * Validate parsed response structure
+   * Core processing logic: Validates and coerces parsed JSON into LLMResponse format.
+   * This function now intelligently handles both V1 and V2 structures.
    */
-  private validateResponse(parsed: any): { valid: boolean; warnings: string[] } {
-    const warnings: string[] = [];
+  private processParsedJson(parsed: any, method: string, extraWarnings: string[] = []): ParseAttempt {
+    const warnings = [...extraWarnings];
+    let result: Partial<LLMResponse> = {}; // Use Partial to build the response
 
-    if (!parsed || typeof parsed !== 'object') {
-      warnings.push('Response is not an object');
-      return { valid: false, warnings };
-    }
-
-    if (!parsed.shortAnswer && !parsed.answer && !parsed.result) {
-      warnings.push('Missing shortAnswer field');
-    }
-
-    if (!parsed.steps && !parsed.explanation) {
-      warnings.push('Missing steps array');
-    } else if (parsed.steps && !Array.isArray(parsed.steps)) {
-      warnings.push('steps is not an array');
-    } else if (parsed.steps && parsed.steps.length === 0) {
-      warnings.push('steps array is empty');
-    }
-
-    return { valid: warnings.length === 0, warnings };
-  }
-
-  /**
-   * Coerce parsed response to valid format
-   */
-  private coerceToValidFormat(parsed: any, existingWarnings: string[] = []): any {
-    const warnings = [...existingWarnings];
-
-    // Coerce shortAnswer
-    let shortAnswer: string;
-    if (typeof parsed.shortAnswer === 'string') {
-      shortAnswer = parsed.shortAnswer;
-    } else if (parsed.shortAnswer !== undefined) {
-      shortAnswer = String(parsed.shortAnswer);
-      warnings.push('shortAnswer was coerced to string');
-    } else if (parsed.answer) {
-      shortAnswer = String(parsed.answer);
-      warnings.push('Used "answer" field instead of "shortAnswer"');
-    } else if (parsed.result) {
-      shortAnswer = String(parsed.result);
-      warnings.push('Used "result" field instead of "shortAnswer"');
-    } else {
-      shortAnswer = 'No answer provided';
-      warnings.push('shortAnswer was missing');
-    }
-
-    // Coerce steps
-    let steps: string[];
-    if (Array.isArray(parsed.steps)) {
-      steps = parsed.steps
-        .map((s: any) => (typeof s === 'string' ? s : String(s)))
-        .filter((s: string) => s.length > 0 && s !== 'null' && s !== 'undefined');
-
-      if (steps.length === 0) {
-        steps = ['No steps provided'];
-        warnings.push('steps array was empty');
+    // Prioritize V2 structure
+    if (parsed.type && typeof parsed.type === 'string' && parsed.content && typeof parsed.content === 'object') {
+      const answerType: AnswerType = parsed.type as AnswerType;
+      result.type = answerType;
+      result.content = parsed.content;
+      result.steps = Array.isArray(parsed.steps) ? parsed.steps : [];
+      result.confidence = parsed.confidence;
+      result.debug_raw_answer = parsed.debug_raw_answer;
+      result.shortAnswer = parsed.debug_raw_answer || this.getV2ShortAnswer(answerType, parsed.content);
+      warnings.push('Parsed as V2 structured response');
+    } 
+    // Fallback to V1 structure
+    else if (parsed.shortAnswer !== undefined || parsed.answer !== undefined) {
+      result.shortAnswer = String(parsed.shortAnswer || parsed.answer || 'No short answer provided');
+      result.steps = Array.isArray(parsed.steps) 
+        ? parsed.steps.map((s: any) => String(s)).filter((s: string) => s.length > 0)
+        : (parsed.explanation && Array.isArray(parsed.explanation) ? parsed.explanation.map((s: any) => String(s)) : []);
+      if (result.steps.length === 0 && (parsed.steps || parsed.explanation)) {
+         result.steps = ['No detailed steps provided'];
+         warnings.push('Steps array was empty or malformed in V1 fallback');
       }
-    } else if (parsed.steps) {
-      steps = [String(parsed.steps)];
-      warnings.push('steps was not an array, converted to single-item array');
-    } else if (parsed.explanation) {
-      steps = Array.isArray(parsed.explanation)
-        ? parsed.explanation.map((e: any) => String(e))
-        : [String(parsed.explanation)];
-      warnings.push('Used "explanation" field instead of "steps"');
+      warnings.push('Parsed as V1 fallback response');
     } else {
-      steps = ['No steps provided'];
-      warnings.push('steps was missing');
+      return { method, success: false, error: 'Unknown JSON structure, neither V1 nor V2 recognized', timestamp: new Date() };
     }
 
+    // Normalize steps - ensure it's always an array of strings
+    if (!Array.isArray(result.steps)) {
+      result.steps = [];
+      warnings.push('Steps was not an array, set to empty');
+    } else {
+      result.steps = result.steps.map(s => String(s)).filter(s => s.length > 0);
+    }
+    
+    // Ensure shortAnswer is always a string
+    if (typeof result.shortAnswer !== 'string') {
+        result.shortAnswer = String(result.shortAnswer || 'Unknown Answer');
+        warnings.push('shortAnswer was coerced to string');
+    }
+
+    // Assign warnings
+    result.warnings = warnings;
+
+    // Final validation and coercion
+    return { method, success: true, result: this.coerceFinalResponse(result as LLMResponse), timestamp: new Date() };
+  }
+
+  /**
+   * Helper to ensure the final LLMResponse conforms to the interface
+   */
+  private coerceFinalResponse(response: LLMResponse): LLMResponse {
     return {
-      shortAnswer,
-      steps,
-      warnings,
+      shortAnswer: response.shortAnswer || 'No answer provided',
+      steps: response.steps || [],
+      type: response.type || 'UNKNOWN',
+      content: response.content || {},
+      confidence: response.confidence || ParseConfidence.FAILED,
+      debug_raw_answer: response.debug_raw_answer,
+      tokenUsage: response.tokenUsage,
+      parseMethod: response.parseMethod,
+      parseAttempts: response.parseAttempts,
+      warnings: response.warnings,
+      partialFailure: response.partialFailure,
+      error: response.error,
     };
+  }
+
+  /**
+   * Helper to generate a string fallback for V2 answers
+   */
+  private getV2ShortAnswer(type: AnswerType, content: any): string {
+    switch (type) {
+      case 'MULTIPLE_CHOICE': return content.choice ? `Choice: ${content.choice}` : 'Unknown Choice';
+      case 'TRUE_FALSE': return content.value !== undefined ? `Value: ${String(content.value).toUpperCase()}` : 'Unknown Value';
+      case 'FILL_IN_THE_BLANK':
+      case 'SHORT_ANSWER': return content.text || 'No answer text';
+      case 'CODING': return 'Code provided (see details)';
+      case 'UNKNOWN': return content.text || 'Unknown Answer Type';
+      default: return 'See details';
+    }
   }
 
   /**
    * Finalize response with metadata
    */
   private finalizeResponse(
-    result: any,
+    result: Partial<LLMResponse>, // Accept partial response
     confidence: ParseConfidence,
     method: string,
     attempts: ParseAttempt[]
   ): LLMResponse {
-    return {
-      shortAnswer: result.shortAnswer,
-      steps: result.steps,
-      confidence,
-      parseMethod: method,
-      parseAttempts: this.config.logAllAttempts ? attempts : undefined,
-      warnings: result.warnings,
-      partialFailure: result.partialFailure,
-    };
+    const finalResult = this.coerceFinalResponse(result as LLMResponse);
+    finalResult.confidence = confidence;
+    finalResult.parseMethod = method;
+    finalResult.parseAttempts = this.config.logAllAttempts ? attempts : undefined;
+    // Warnings are already part of result.warnings
+    return finalResult;
   }
 
   /**
@@ -457,45 +305,39 @@ export class ExpertParser {
         'Please try again with a different question or mode',
         `Error code: ${errorCode}`,
       ],
-      error: errorCode,
+      type: 'UNKNOWN', // Default to UNKNOWN on error
+      content: { text: errorMessage },
       confidence: ParseConfidence.FAILED,
       parseMethod: 'none',
       parseAttempts: this.config.logAllAttempts ? attempts : undefined,
+      error: errorCode,
     };
   }
 
-  // ============================================================================
-  // TEXT CLEANING UTILITIES
-  // ============================================================================
+  // --- TEXT CLEANING UTILITIES ---
 
   /**
-   * Remove markdown code blocks
+   * Remove markdown code blocks (```json...``` or ```...```)
    */
   private removeMarkdownCodeBlocks(text: string): string {
     return text.replace(/```(?:json)?\s*([\s\S]*?)```/g, '$1');
   }
 
   /**
-   * Fix common JSON issues
+   * Fix common JSON issues like trailing commas or comments.
    */
   private fixCommonJSONIssues(text: string): string {
     let fixed = text;
-
-    // Remove trailing commas before closing braces/brackets
-    fixed = fixed.replace(/,(\s*[}\]])/g, '$1');
-
-    // Remove comments (// and /* */)
-    fixed = fixed.replace(/\/\/.*$/gm, '');
-    fixed = fixed.replace(/\/\*[\s\S]*?\*\//g, '');
-
-    // Fix common typos
-    fixed = fixed.replace(/'/g, '"'); // Single quotes to double quotes (risky but common)
-
+    fixed = fixed.replace(/,(\s*[\}\]])/g, '$1'); // Remove trailing commas
+    fixed = fixed.replace(/\/\/.*$/gm, ''); // Remove single-line comments
+    fixed = fixed.replace(/\/\*[\s\S]*?\*\//g, ''); // Remove multi-line comments
+    fixed = fixed.replace(/'/g, '"'); // Convert single quotes to double quotes (common LLM mistake)
     return fixed;
   }
 
   /**
-   * Extract JSON substring with balanced braces
+   * Extracts the outermost JSON object from a string, handling nested braces.
+   * This is a robust way to find JSON even with surrounding text.
    */
   private extractJSONSubstring(text: string): string | null {
     const firstBrace = text.indexOf('{');
@@ -518,6 +360,7 @@ export class ExpertParser {
         continue;
       }
 
+      // Toggle inString state only if not escaped
       if (char === '"') {
         inString = !inString;
         continue;
@@ -525,14 +368,14 @@ export class ExpertParser {
 
       if (!inString) {
         if (char === '{') depth++;
-        if (char === '}') depth--;
+        else if (char === '}') depth--;
 
         if (depth === 0) {
           return text.substring(firstBrace, i + 1);
         }
       }
     }
-
+    // If we reach here, braces are unbalanced or string is not properly closed
     return null;
   }
 }
