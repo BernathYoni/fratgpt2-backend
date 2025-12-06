@@ -14,7 +14,6 @@ REQUIRED FORMAT:
 NON-NEGOTIABLE REQUIREMENTS:
 ✓ MUST return valid JSON only - no markdown, no code blocks, no extra text
 ✓ shortAnswer: ONE concise answer (number, letter choice, or brief phrase)
-✓ DO NOT include "steps" or explanations
 ✓ DO NOT wrap JSON in code blocks
 
 REMEMBER: Perfect JSON format with ONLY shortAnswer.`;
