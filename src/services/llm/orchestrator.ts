@@ -136,7 +136,7 @@ export class LLMOrchestrator {
 
         console.log(`[REGULAR] ✅ ${providerName.toUpperCase()} SUCCESS`);
         console.log(`[REGULAR]    shortAnswer: "${response.shortAnswer}"`);
-        console.log(`[REGULAR]    steps count: ${response.steps.length}`);
+        console.log(`[REGULAR]    steps count: ${response.steps?.length || 0}`);
         console.log(`[REGULAR]    confidence: ${response.confidence ?? 'N/A'}`);
 
         if (response.warnings && response.warnings.length > 0) {
@@ -233,7 +233,7 @@ export class LLMOrchestrator {
 
         console.log(`[EXPERT] ✅ ${providerName.toUpperCase()} SUCCESS`);
         console.log(`[EXPERT]    shortAnswer: "${response.shortAnswer}"`);
-        console.log(`[EXPERT]    steps count: ${response.steps.length}`);
+        console.log(`[EXPERT]    steps count: ${response.steps?.length || 0}`);
         console.log(`[EXPERT]    confidence: ${response.confidence ?? 'N/A'}`);
         console.log(`[EXPERT]    parseMethod: ${response.parseMethod ?? 'N/A'}`);
 
