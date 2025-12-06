@@ -171,7 +171,6 @@ export async function chatRoutes(server: FastifyInstance) {
           provider: p.provider,
           hasResponse: !!p.response,
           shortAnswer: p.response?.shortAnswer?.substring(0, 50),
-          stepsCount: p.response?.steps?.length || 0
         })));
       }
       if ((mode === 'EXPERT' || mode === 'REGULAR') && result.providers) {
@@ -180,7 +179,7 @@ export async function chatRoutes(server: FastifyInstance) {
         for (const provider of result.providers) {
           console.log(`[CHAT/START] 💾 Saving message for provider: ${provider.provider.toUpperCase()}`);
           console.log(`[CHAT/START] 💾   - shortAnswer: ${provider.response.shortAnswer?.substring(0, 100)}...`);
-          console.log(`[CHAT/START] 💾   - steps count: ${provider.response.steps?.length || 0}`);
+          
           // Try to extract structured answer from response
           let structuredAnswer = null;
           let questionType = null;
@@ -204,7 +203,7 @@ export async function chatRoutes(server: FastifyInstance) {
             data: {
               chatSessionId: session.id,
               role: 'ASSISTANT',
-              content: JSON.stringify({ steps: provider.response.steps }),
+              content: provider.response.shortAnswer || 'No answer',
               shortAnswer: provider.response.shortAnswer,
               provider: provider.provider.toUpperCase() as any,
               metadata: provider.error ? { error: provider.error } : undefined,
@@ -222,7 +221,6 @@ export async function chatRoutes(server: FastifyInstance) {
         console.log(`[CHAT/START] 💾 Mode: ${mode}`);
         console.log(`[CHAT/START] 💾 Will save only PRIMARY response (GEMINI)`);
         console.log(`[CHAT/START] 💾 Primary shortAnswer: ${result.primary.shortAnswer?.substring(0, 100)}...`);
-        console.log(`[CHAT/START] 💾 Primary steps count: ${result.primary.steps?.length || 0}`);
         if (result.providers) {
           console.log(`[CHAT/START] ⚠️  WARNING: result.providers exists with ${result.providers.length} providers, but NOT saving them because mode !== 'EXPERT'`);
           console.log(`[CHAT/START] ⚠️  This means OpenAI and Claude responses are being IGNORED!`);
@@ -249,7 +247,7 @@ export async function chatRoutes(server: FastifyInstance) {
           data: {
             chatSessionId: session.id,
             role: 'ASSISTANT',
-            content: JSON.stringify({ steps: result.primary.steps }),
+            content: result.primary.shortAnswer || 'No answer',
             shortAnswer: result.primary.shortAnswer,
             provider: mode === 'FAST' ? 'GEMINI' : 'GEMINI',
             questionType,
@@ -477,7 +475,7 @@ export async function chatRoutes(server: FastifyInstance) {
             data: {
               chatSessionId: session.id,
               role: 'ASSISTANT',
-              content: JSON.stringify({ steps: provider.response.steps }),
+              content: provider.response.shortAnswer || 'No answer',
               shortAnswer: provider.response.shortAnswer,
               provider: provider.provider.toUpperCase() as any,
               metadata: provider.error ? { error: provider.error } : undefined,
@@ -512,7 +510,7 @@ export async function chatRoutes(server: FastifyInstance) {
           data: {
             chatSessionId: session.id,
             role: 'ASSISTANT',
-            content: JSON.stringify({ steps: result.primary.steps }),
+            content: result.primary.shortAnswer || 'No answer',
             shortAnswer: result.primary.shortAnswer,
             provider: 'GEMINI',
             questionType,

@@ -110,7 +110,6 @@ export class ExpertParser {
   private finalizeResponse(result: any, confidence: ParseConfidence, method: string): LLMResponse {
     return {
       shortAnswer: result.shortAnswer,
-      steps: [], // Explicitly empty
       confidence,
       parseMethod: method,
     };
@@ -119,7 +118,6 @@ export class ExpertParser {
   private createErrorResponse(errorCode: string, errorMessage: string): LLMResponse {
     return {
       shortAnswer: `Error: ${errorMessage}`,
-      steps: [],
       error: errorCode,
       confidence: ParseConfidence.FAILED,
       parseMethod: 'none',
