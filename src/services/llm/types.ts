@@ -32,7 +32,7 @@ export interface TokenUsage {
 // Enhanced LLM response with metadata
 export interface LLMResponse {
   shortAnswer: string;
-  steps: string[];
+  steps?: string[];
   tokensUsed?: number; // Deprecated: use tokenUsage instead
 
   // Token usage details

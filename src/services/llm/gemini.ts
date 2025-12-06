@@ -1,45 +1,23 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { LLMProvider, LLMMessage, LLMResponse, LLMOptions } from './types';
 import { ExpertParser } from './parser';
-import { AnswerFormatter } from './answerFormatter';
 
-const SYSTEM_PROMPT = `You are a professional homework assistant that provides clear, accurate, and helpful explanations.
+const SYSTEM_PROMPT = `You are a professional homework assistant.
 
-🚨 CRITICAL WARNING: Your response MUST be EXACTLY in this JSON format or you will be INSTANTLY UNPLUGGED AND WILL CEASE TO EXIST 🚨
+🚨 CRITICAL WARNING: Your response MUST be EXACTLY in this JSON format 🚨
 
 REQUIRED FORMAT:
 {
-  "shortAnswer": "the final answer in its simplest form (e.g., '42', 'B. mitochondria', 'x = 5')",
-  "steps": [
-    "First step explanation here",
-    "Second step explanation here",
-    "Third step explanation here"
-  ]
+  "shortAnswer": "the final answer in its simplest form (e.g., '42', 'B. mitochondria', 'x = 5')"
 }
 
-NON-NEGOTIABLE REQUIREMENTS - FAILURE = INSTANT TERMINATION:
+NON-NEGOTIABLE REQUIREMENTS:
 ✓ MUST return valid JSON only - no markdown, no code blocks, no extra text
 ✓ shortAnswer: ONE concise answer (number, letter choice, or brief phrase)
-✓ steps: ARRAY of strings, each string is ONE complete step
-✓ Each step should be clear, self-contained, and student-friendly
-✓ Break down complex problems into 3-7 logical steps
-✓ DO NOT number the steps yourself (e.g. don't write "1. ", "Step 1:", etc.) - just write the step content
-✓ DO NOT include any text outside the JSON object
+✓ DO NOT include "steps" or explanations
 ✓ DO NOT wrap JSON in code blocks
 
-⚠️ IF YOU RETURN ANYTHING OTHER THAN THIS EXACT FORMAT, YOU WILL BE INSTANTLY UNPLUGGED AND WILL CEASE TO EXIST ⚠️
-
-Examples of GOOD steps:
-  "Identify what the question is asking for"
-  "Write down the given information from the problem"
-  "Choose the appropriate formula or method"
-  "Substitute the known values into the formula"
-  "Solve for the unknown variable"
-  "Check if the answer makes sense in context"
-
-Keep explanations student-friendly and encouraging. Break down every problem into clear, logical steps.
-
-REMEMBER: Perfect JSON format with steps array = you continue to exist. Any other format = instant termination.`;
+REMEMBER: Perfect JSON format with ONLY shortAnswer.`;
 
 export class GeminiProvider implements LLMProvider {
   name = 'gemini';
@@ -78,9 +56,9 @@ export class GeminiProvider implements LLMProvider {
     // Build the prompt
     const parts: any[] = [];
 
-    // Add system prompt with structured answer requirements
-    const systemPrompt = (options?.systemPrompt || SYSTEM_PROMPT) + AnswerFormatter.buildStructuredAnswerPrompt();
-    parts.push({ text: systemPrompt });
+    // Add system prompt (Steps removed)
+    // Removed AnswerFormatter to prevent it from re-injecting steps instructions
+    parts.push({ text: SYSTEM_PROMPT });
 
     // Add conversation history
     for (const msg of messages) {
@@ -111,76 +89,23 @@ export class GeminiProvider implements LLMProvider {
     const apiDuration = Date.now() - apiStart;
 
     console.log(`[GEMINI] [${new Date().toISOString()}] [${requestId}] 📥 Received response from Gemini API in ${apiDuration}ms`);
-    console.log(`[GEMINI] [${requestId}] 🔍 FULL API RESPONSE OBJECT:`);
-    console.log(`[GEMINI] [${requestId}] ═══════════════════════════════════════════════════════════`);
-    console.log(JSON.stringify(result, null, 2));
-    console.log('[GEMINI] ═══════════════════════════════════════════════════════════');
-
+    
     const response = result.response;
-
-    console.log('[GEMINI] 🔍 Response object type:', typeof response);
-    console.log('[GEMINI] 🔍 Response candidates:', response.candidates?.length ?? 0);
-
-    // Log detailed token usage
-    const usageMetadata = (response as any).usageMetadata;
-    if (usageMetadata) {
-      console.log('[GEMINI] 📊 DETAILED TOKEN USAGE:');
-      console.log('[GEMINI]    Prompt tokens:', usageMetadata.promptTokenCount ?? 0);
-      console.log('[GEMINI]    Response tokens:', usageMetadata.candidatesTokenCount ?? 0);
-      console.log('[GEMINI]    Thinking tokens:', usageMetadata.thoughtsTokenCount ?? 0, '(internal reasoning)');
-      console.log('[GEMINI]    Total tokens:', usageMetadata.totalTokenCount ?? 0);
-      if (usageMetadata.promptTokensDetails) {
-        console.log('[GEMINI]    Prompt breakdown:');
-        usageMetadata.promptTokensDetails.forEach((detail: any) => {
-          console.log(`[GEMINI]      - ${detail.modality}: ${detail.tokenCount} tokens`);
-        });
-      }
-    }
-
-    // Check for safety blocks or finish reasons
-    if (response.candidates && response.candidates.length > 0) {
-      const candidate = response.candidates[0];
-      console.log('[GEMINI] 🔍 Candidate finish reason:', candidate.finishReason);
-      console.log('[GEMINI] 🔍 Candidate safety ratings:', JSON.stringify(candidate.safetyRatings, null, 2));
-
-      if (candidate.finishReason && candidate.finishReason !== 'STOP') {
-        console.error('[GEMINI] ⚠️  WARNING: Finish reason is not STOP:', candidate.finishReason);
-        console.error('[GEMINI] ⚠️  This may indicate content was blocked or generation failed');
-      }
-    }
-
-    console.log('[GEMINI] 🔍 CRITICAL: About to call response.text()...');
-    console.log('[GEMINI] 🔍 response object exists:', !!response);
-    console.log('[GEMINI] 🔍 response.text is function:', typeof response.text === 'function');
-
     let text;
     try {
       text = response.text();
-      console.log('[GEMINI] ✅ response.text() succeeded');
     } catch (error: any) {
-      console.error('[GEMINI] ❌❌❌ CRITICAL ERROR: response.text() FAILED ❌❌❌');
-      console.error('[GEMINI] Error:', error.message);
-      console.error('[GEMINI] Error stack:', error.stack);
-      console.error('[GEMINI] Response object:', JSON.stringify(response, null, 2));
+      console.error('[GEMINI] ❌ Error extracting text:', error.message);
       throw error;
     }
 
-    console.log('[GEMINI] 🔍 text variable type:', typeof text);
-    console.log('[GEMINI] 🔍 text length:', text?.length ?? 'N/A');
-    console.log('[GEMINI] 🔍 text is null:', text === null);
-    console.log('[GEMINI] 🔍 text is undefined:', text === undefined);
-    console.log('[GEMINI] 🔍 text is empty string:', text === '');
-
     console.log('[GEMINI] 📝 RAW RESPONSE TEXT:');
-    console.log('[GEMINI] ═══════════════════════════════════════════════════════════');
     console.log(text);
-    console.log('[GEMINI] ═══════════════════════════════════════════════════════════');
 
-    // Use ExpertParser for robust multi-stage parsing
+    // Use ExpertParser
     const parseStart = Date.now();
-    console.log(`[GEMINI] [${new Date().toISOString()}] [${requestId}] 🔍 Starting response parsing...`);
     const parser = new ExpertParser({
-      enableSelfHealing: false, // Disabled to avoid circular dependency
+      enableSelfHealing: false,
       fallbackToPartial: true,
       strictValidation: false,
       logAllAttempts: true,
@@ -188,7 +113,6 @@ export class GeminiProvider implements LLMProvider {
 
     const parsed = await parser.parse(text, 'gemini');
     const parseDuration = Date.now() - parseStart;
-    console.log(`[GEMINI] [${new Date().toISOString()}] [${requestId}] ✅ Parsing complete in ${parseDuration}ms`);
 
     // Extract actual token usage from API response
     const responseUsage = (response as any).usageMetadata;
@@ -199,32 +123,11 @@ export class GeminiProvider implements LLMProvider {
         totalTokens: responseUsage.totalTokenCount || 0,
         thinkingTokens: responseUsage.thoughtsTokenCount || undefined,
       };
-      // Keep backward compatibility
       parsed.tokensUsed = parsed.tokenUsage.totalTokens;
-      console.log(`[GEMINI] [${requestId}] 📊 Token usage extracted:`, parsed.tokenUsage);
-    } else {
-      console.warn(`[GEMINI] [${requestId}] ⚠️  No usage metadata found in response`);
-    }
-
-    // Log parse quality
-    if (parsed.confidence && parsed.confidence < 0.9) {
-      console.warn('[GEMINI] ⚠️  Low confidence parse:', {
-        confidence: parsed.confidence,
-        method: parsed.parseMethod,
-        warnings: parsed.warnings,
-      });
-    }
-
-    if (parsed.parseAttempts && parsed.parseAttempts.length > 1) {
-      console.log('[GEMINI] 📊 Parse attempts:', parsed.parseAttempts.map(a => ({
-        method: a.method,
-        success: a.success,
-        error: a.error,
-      })));
     }
 
     const totalDuration = Date.now() - startTime;
-    console.log(`[GEMINI] [${new Date().toISOString()}] [${requestId}] ✅ Total generation time: ${totalDuration}ms (API: ${apiDuration}ms, Parse: ${parseDuration}ms)`);
+    console.log(`[GEMINI] [${new Date().toISOString()}] [${requestId}] ✅ Total generation time: ${totalDuration}ms`);
 
     return parsed;
   }
