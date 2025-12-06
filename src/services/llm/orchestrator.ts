@@ -24,7 +24,7 @@ export class LLMOrchestrator {
   /**
    * Generate response based on mode
    */
-  async generate(mode: ChatMode, messages: LLMMessage[]): Promise<{
+  async generate(mode: ChatMode, messages: LLMMessage[], options?: { v2?: boolean }): Promise<{
     primary: LLMResponse;
     providers?: ProviderResult[];
   }> {
@@ -33,21 +33,22 @@ export class LLMOrchestrator {
     console.log('[ORCHESTRATOR] Mode:', mode);
     console.log('[ORCHESTRATOR] Messages count:', messages.length);
     console.log('[ORCHESTRATOR] Has image:', messages.some(m => !!m.imageData));
+    console.log('[ORCHESTRATOR] Options:', JSON.stringify(options));
 
     try {
       let result;
       switch (mode) {
         case 'FAST':
           console.log(`[ORCHESTRATOR] [${new Date().toISOString()}] → Routing to generateFast()`);
-          result = await this.generateFast(messages);
+          result = await this.generateFast(messages, options);
           break;
         case 'REGULAR':
           console.log(`[ORCHESTRATOR] [${new Date().toISOString()}] → Routing to generateRegular()`);
-          result = await this.generateRegular(messages);
+          result = await this.generateRegular(messages, options);
           break;
         case 'EXPERT':
           console.log(`[ORCHESTRATOR] [${new Date().toISOString()}] → Routing to generateExpert()`);
-          result = await this.generateExpert(messages);
+          result = await this.generateExpert(messages, options);
           break;
         default:
           throw new Error(`Unknown mode: ${mode}`);
@@ -66,7 +67,7 @@ export class LLMOrchestrator {
   /**
    * Fast mode: Use cheaper/faster model
    */
-  private async generateFast(messages: LLMMessage[]) {
+  private async generateFast(messages: LLMMessage[], options?: { v2?: boolean }) {
     const startTime = Date.now();
     console.log(`[FAST] [${new Date().toISOString()}] Calling Gemini with maxTokens=4096, temp=0.5`);
     try {
@@ -74,6 +75,7 @@ export class LLMOrchestrator {
         maxTokens: 4096, // Increased from 1024 to allow for longer responses
         temperature: 0.5,
         mode: 'FAST', // Ensure Flash model is used
+        v2: options?.v2,
       });
       const duration = Date.now() - startTime;
       console.log(`[FAST] [${new Date().toISOString()}] ✅ Gemini responded successfully in ${duration}ms`);
@@ -87,7 +89,7 @@ export class LLMOrchestrator {
   /**
    * Regular mode: Call all 3 providers with mid-tier models
    */
-  private async generateRegular(messages: LLMMessage[]) {
+  private async generateRegular(messages: LLMMessage[], options?: { v2?: boolean }) {
     const startTime = Date.now();
     const requestId = `REGULAR-${Date.now()}`;
     console.log(`[REGULAR] [${new Date().toISOString()}] [${requestId}] 🚀 Starting Regular mode with 3 providers`);
@@ -99,6 +101,7 @@ export class LLMOrchestrator {
       temperature: 0.7,
       requestId,
       mode: 'REGULAR' as const, // Gemini 2.5 Pro, GPT-4 Turbo, Claude Sonnet 4.5
+      v2: options?.v2,
     };
 
     const parallelStart = Date.now();
@@ -184,7 +187,7 @@ export class LLMOrchestrator {
   /**
    * Expert mode: Call all 3 providers and return their responses
    */
-  private async generateExpert(messages: LLMMessage[]) {
+  private async generateExpert(messages: LLMMessage[], options?: { v2?: boolean }) {
     const startTime = Date.now();
     const requestId = `EXPERT-${Date.now()}`; // Unique ID for this expert request
     console.log(`[EXPERT] [${new Date().toISOString()}] [${requestId}] 🚀 Starting Expert mode generation`);
@@ -196,6 +199,7 @@ export class LLMOrchestrator {
       temperature: 0.7,
       requestId, // Pass request ID to providers
       mode: 'EXPERT' as const, // Use Pro models for expert mode
+      v2: options?.v2,
     };
 
     const parallelStart = Date.now();
