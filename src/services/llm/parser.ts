@@ -146,7 +146,7 @@ export class ExpertParser {
 
     // Try to extract V1 shortAnswer if V2 content is not strong
     if (!content.text && !content.choice && !content.value && !content.code) {
-        const shortAnswerPatterns = ["shortAnswer"\s*:\s*"([^"]*)", /"answer"\s*:\s*"([^"]*)"/];
+        const shortAnswerPatterns = [/"shortAnswer"\s*:\s*"([^"]*)"/, /"answer"\s*:\s*"([^"]*)"/];
         for (const pattern of shortAnswerPatterns) {
           const match = text.match(pattern);
           if (match) {
@@ -212,7 +212,7 @@ export class ExpertParser {
       result.steps = Array.isArray(parsed.steps) 
         ? parsed.steps.map((s: any) => String(s)).filter((s: string) => s.length > 0)
         : (parsed.explanation && Array.isArray(parsed.explanation) ? parsed.explanation.map((s: any) => String(s)) : []);
-      if (result.steps.length === 0 && (parsed.steps || parsed.explanation)) {
+      if (result.steps?.length === 0 && (parsed.steps || parsed.explanation)) {
          result.steps = ['No detailed steps provided'];
          warnings.push('Steps array was empty or malformed in V1 fallback');
       }
