@@ -212,10 +212,7 @@ export class ExpertParser {
       result.steps = Array.isArray(parsed.steps) 
         ? parsed.steps.map((s: any) => String(s)).filter((s: string) => s.length > 0)
         : (parsed.explanation && Array.isArray(parsed.explanation) ? parsed.explanation.map((s: any) => String(s)) : []);
-      if (result.steps?.length === 0 && (parsed.steps || parsed.explanation)) {
-         result.steps = ['No detailed steps provided'];
-         warnings.push('Steps array was empty or malformed in V1 fallback');
-      }
+      // Removed fallback that was creating ghost steps
       warnings.push('Parsed as V1 fallback response');
     } else {
       return { method, success: false, error: 'Unknown JSON structure, neither V1 nor V2 recognized', timestamp: new Date() };
