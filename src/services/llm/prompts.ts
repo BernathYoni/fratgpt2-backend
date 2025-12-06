@@ -101,7 +101,7 @@ Return this EXACT JSON structure:
 **Input:** [Image of multiple choice: A. Cat, B. Dog. Question: Which barks?]
 **Output:**
 {
-  "type": "MULTIPLE_CHOICE", 
+  "type": "MULTIPLE_CHOICE",
   "content": { "choice": "B" }, 
   "steps": [], 
   "confidence": 1.0, 
