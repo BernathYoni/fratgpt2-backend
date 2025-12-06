@@ -17,7 +17,6 @@ const startChatSchema = z.object({
   message: z.string().min(1),
   imageData: z.string().optional(), // base64
   captureSource: z.enum(['SCREEN', 'SNIP']).optional(),
-  v2: z.boolean().optional(), // Feature flag for V2 redesign
 });
 
 const sendMessageSchema = z.object({
@@ -25,7 +24,6 @@ const sendMessageSchema = z.object({
   imageData: z.string().optional(),
   captureSource: z.enum(['SCREEN', 'SNIP']).optional(),
   mode: z.enum(['REGULAR', 'FAST', 'EXPERT']).optional(), // Allow mode switching for new captures
-  v2: z.boolean().optional(), // Feature flag for V2 redesign
 });
 
 export async function chatRoutes(server: FastifyInstance) {
@@ -34,10 +32,6 @@ export async function chatRoutes(server: FastifyInstance) {
     const requestStart = Date.now();
     console.log('\n' + '='.repeat(80));
     console.log(`[CHAT/START] [${new Date().toISOString()}] 🚀 New chat request received`);
-    console.log('[CHAT/START] 📦 RAW BODY:', JSON.stringify(request.body, (key, value) => {
-      if (key === 'imageData') return '[BASE64_IMAGE_DATA]'; // Don't log massive image strings
-      return value;
-    }, 2));
 
     try {
       const authStart = Date.now();
@@ -47,14 +41,13 @@ export async function chatRoutes(server: FastifyInstance) {
 
       const parseStart = Date.now();
       console.log(`[CHAT/START] [${new Date().toISOString()}] 📦 Parsing request body...`);
-      const { mode, message, imageData, captureSource, v2 } = startChatSchema.parse(request.body);
+      const { mode, message, imageData, captureSource } = startChatSchema.parse(request.body);
       console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ Parsed in ${Date.now() - parseStart}ms`);
       console.log('[CHAT/START] Mode:', mode);
       console.log('[CHAT/START] Message:', message);
       console.log('[CHAT/START] Has image:', !!imageData);
       console.log('[CHAT/START] Image size:', imageData ? `${(imageData.length / 1024).toFixed(2)} KB` : 'N/A');
       console.log('[CHAT/START] Capture source:', captureSource);
-      console.log('[CHAT/START] V2 Enabled:', v2);
 
       // Check rate limits and mode restrictions
       const limitCheckStart = Date.now();
@@ -162,7 +155,7 @@ export async function chatRoutes(server: FastifyInstance) {
       console.log(`[CHAT/START] [${new Date().toISOString()}] 🤖 Calling LLM orchestrator.generate()...`);
       console.log('[CHAT/START] Mode:', mode);
       const llmStart = Date.now();
-      const result = await orchestrator.generate(mode as ChatMode, llmMessages, { v2 });
+      const result = await orchestrator.generate(mode as ChatMode, llmMessages);
       const llmDuration = Date.now() - llmStart;
       console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ LLM response received in ${llmDuration}ms`);
 
@@ -252,13 +245,11 @@ export async function chatRoutes(server: FastifyInstance) {
           // Not structured JSON, use legacy format
         }
 
-        const debug_raw_answer = result.primary.debug_raw_answer;
-
         await prisma.message.create({
           data: {
             chatSessionId: session.id,
             role: 'ASSISTANT',
-            content: debug_raw_answer || result.primary.shortAnswer || 'No answer',
+            content: JSON.stringify({ steps: result.primary.steps }),
             shortAnswer: result.primary.shortAnswer,
             provider: mode === 'FAST' ? 'GEMINI' : 'GEMINI',
             questionType,
@@ -377,7 +368,7 @@ export async function chatRoutes(server: FastifyInstance) {
     try {
       const { userId } = await authenticate(request);
       const { sessionId } = request.params as { sessionId: string };
-      const { message, imageData, captureSource, mode, v2 } = sendMessageSchema.parse(request.body);
+      const { message, imageData, captureSource, mode } = sendMessageSchema.parse(request.body);
 
       // Get session
       const session = await prisma.chatSession.findUnique({
@@ -400,7 +391,6 @@ export async function chatRoutes(server: FastifyInstance) {
       console.log('[CHAT/MESSAGE] Mode from request:', mode);
       console.log('[CHAT/MESSAGE] Effective mode:', effectiveMode);
       console.log('[CHAT/MESSAGE] Has image:', !!imageData);
-      console.log('[CHAT/MESSAGE] V2 Enabled:', v2);
 
       // Update session mode if a new mode was provided (user switched modes for this capture)
       if (mode && mode !== session.mode) {
@@ -459,7 +449,7 @@ export async function chatRoutes(server: FastifyInstance) {
       });
 
       // Generate response using effective mode
-      const result = await orchestrator.generate(effectiveMode as ChatMode, llmMessages, { v2 });
+      const result = await orchestrator.generate(effectiveMode as ChatMode, llmMessages);
 
       // Save response(s) with structured answer data
       if ((effectiveMode === 'EXPERT' || effectiveMode === 'REGULAR') && result.providers) {
@@ -517,8 +507,6 @@ export async function chatRoutes(server: FastifyInstance) {
         } catch {
           // Not structured JSON, use legacy format
         }
-
-        const debug_raw_answer = result.primary.debug_raw_answer;
 
         await prisma.message.create({
           data: {
