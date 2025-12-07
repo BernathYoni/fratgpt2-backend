@@ -365,6 +365,50 @@ export async function adminRoutes(server: FastifyInstance) {
         const lifetimeCost = user.usage.reduce((sum, u) => sum + (u.totalMonthlyCost || 0), 0);
         const lifetimeSolves = user.usage.reduce((sum, u) => sum + (u.solvesUsed || 0), 0);
 
+        // Calculate monthly usage stats
+        const limits = {
+          FREE: { type: 'solves', limit: 20 },
+          BASIC: { type: 'cost', limit: 4.00 },
+          PRO: { type: 'cost', limit: 16.00 },
+        };
+        
+        const userPlan = plan as keyof typeof limits;
+        const limitConfig = limits[userPlan] || limits.FREE;
+        
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        
+        const currentUsageRecord = user.usage.find(u => {
+          const d = new Date(u.date);
+          return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        });
+        
+        let usageThisMonthPercent = 0;
+        if (currentUsageRecord) {
+          if (limitConfig.type === 'solves') {
+            usageThisMonthPercent = (currentUsageRecord.solvesUsed / limitConfig.limit) * 100;
+          } else {
+            usageThisMonthPercent = (currentUsageRecord.totalMonthlyCost / limitConfig.limit) * 100;
+          }
+        }
+        
+        let totalPercent = 0;
+        let monthsCount = 0;
+        
+        user.usage.forEach(u => {
+           let percent = 0;
+           if (limitConfig.type === 'solves') {
+             percent = (u.solvesUsed / limitConfig.limit) * 100;
+           } else {
+             percent = (u.totalMonthlyCost / limitConfig.limit) * 100;
+           }
+           totalPercent += percent;
+           monthsCount++;
+        });
+        
+        const averageMonthlyUsagePercent = monthsCount > 0 ? totalPercent / monthsCount : 0;
+
         return {
           id: user.id,
           email: user.email,
@@ -374,6 +418,8 @@ export async function adminRoutes(server: FastifyInstance) {
           planSince,
           lifetimeCost,
           lifetimeSolves,
+          usageThisMonthPercent,
+          averageMonthlyUsagePercent,
         };
       });
 
