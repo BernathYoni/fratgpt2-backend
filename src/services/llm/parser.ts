@@ -95,6 +95,13 @@ export class ExpertParser {
 
     if (parsed.shortAnswer || parsed.answer) {
       shortAnswer = String(parsed.shortAnswer || parsed.answer);
+    } else if (parsed.content && typeof parsed.content === 'object') {
+       // Fallback: try to construct shortAnswer from content
+       if (parsed.content.text) shortAnswer = parsed.content.text;
+       else if (parsed.content.choice) shortAnswer = parsed.content.choice;
+       else if (parsed.content.value !== undefined) shortAnswer = String(parsed.content.value);
+       else if (parsed.content.code) shortAnswer = parsed.content.code;
+       else return { method, success: false, error: 'Missing shortAnswer', timestamp: new Date() };
     } else {
       return { method, success: false, error: 'Missing shortAnswer', timestamp: new Date() };
     }
@@ -102,7 +109,11 @@ export class ExpertParser {
     return {
       method,
       success: true,
-      result: { shortAnswer },
+      result: { 
+        shortAnswer,
+        questionType: parsed.questionType || parsed.type,
+        structuredAnswer: parsed
+      },
       timestamp: new Date(),
     };
   }
@@ -110,6 +121,8 @@ export class ExpertParser {
   private finalizeResponse(result: any, confidence: ParseConfidence, method: string): LLMResponse {
     return {
       shortAnswer: result.shortAnswer,
+      questionType: result.questionType,
+      structuredAnswer: result.structuredAnswer,
       confidence,
       parseMethod: method,
     };

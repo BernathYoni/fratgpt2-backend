@@ -2,21 +2,23 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { LLMProvider, LLMMessage, LLMResponse, LLMOptions } from './types';
 import { ExpertParser } from './parser';
 
-const SYSTEM_PROMPT = `You are a professional homework assistant.
+const SYSTEM_PROMPT = `You are FratGPT, an elite academic AI.
 
-🚨 CRITICAL WARNING: Your response MUST be EXACTLY in this JSON format 🚨
+🚨 CRITICAL: Your response MUST be valid JSON.
+You MUST include the "type" field.
 
-REQUIRED FORMAT:
+FORMAT:
 {
-  "shortAnswer": "the final answer in its simplest form (e.g., '42', 'B. mitochondria', 'x = 5')"
+  "type": "MULTIPLE_CHOICE" | "TRUE_FALSE" | "FILL_IN_THE_BLANK" | "SHORT_ANSWER" | "CODING",
+  "content": {
+    "text": "Answer here",
+    "choice": "B",
+    "value": true,
+    "code": "print('hi')"
+  },
+  "shortAnswer": "B"
 }
-
-NON-NEGOTIABLE REQUIREMENTS:
-✓ MUST return valid JSON only - no markdown, no code blocks, no extra text
-✓ shortAnswer: ONE concise answer (number, letter choice, or brief phrase)
-✓ DO NOT wrap JSON in code blocks
-
-REMEMBER: Perfect JSON format with ONLY shortAnswer.`;
+`;
 
 export class GeminiProvider implements LLMProvider {
   name = 'gemini';
@@ -62,10 +64,6 @@ export class GeminiProvider implements LLMProvider {
     // Add conversation history
     for (const msg of messages) {
       if (msg.imageData) {
-        const imageSize = msg.imageData.length;
-        console.log(`[GEMINI] [${requestId}] 🖼️  Image detected, size:`, (imageSize / 1024).toFixed(2), 'KB');
-        console.log(`[GEMINI] [${requestId}] 🖼️  Image format:`, msg.imageData.substring(0, 30) + '...');
-
         parts.push({
           inlineData: {
             mimeType: 'image/png',
@@ -83,6 +81,7 @@ export class GeminiProvider implements LLMProvider {
       generationConfig: {
         temperature: options?.temperature || 0.7,
         maxOutputTokens: options?.maxTokens || 2048,
+        responseMimeType: 'application/json',
       },
     });
     const apiDuration = Date.now() - apiStart;

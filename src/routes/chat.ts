@@ -180,24 +180,11 @@ export async function chatRoutes(server: FastifyInstance) {
           console.log(`[CHAT/START] 💾 Saving message for provider: ${provider.provider.toUpperCase()}`);
           console.log(`[CHAT/START] 💾   - shortAnswer: ${provider.response.shortAnswer?.substring(0, 100)}...`);
           
-          // Try to extract structured answer from response
-          let structuredAnswer = null;
-          let questionType = null;
+          // Use structured answer from response
+          let structuredAnswer = provider.response.structuredAnswer || null;
+          let questionType = provider.response.questionType || null;
           let answerFormat = null;
           let confidence = provider.response.confidence || null;
-
-          try {
-            // Parse the response to check if it has structured answer
-            const parsed = JSON.parse(provider.response.shortAnswer);
-            if (parsed.questionType && parsed.answer) {
-              structuredAnswer = parsed;
-              questionType = parsed.questionType;
-              answerFormat = parsed.expectedFormat;
-              confidence = parsed.confidence || confidence;
-            }
-          } catch {
-            // Not structured JSON, use legacy format
-          }
 
           await prisma.message.create({
             data: {
@@ -225,23 +212,12 @@ export async function chatRoutes(server: FastifyInstance) {
           console.log(`[CHAT/START] ⚠️  WARNING: result.providers exists with ${result.providers.length} providers, but NOT saving them because mode !== 'EXPERT'`);
           console.log(`[CHAT/START] ⚠️  This means OpenAI and Claude responses are being IGNORED!`);
         }
-        let structuredAnswer = null;
-        let questionType = null;
+        
+        // Use structured answer from response
+        let structuredAnswer = result.primary.structuredAnswer || null;
+        let questionType = result.primary.questionType || null;
         let answerFormat = null;
         let confidence = result.primary.confidence || null;
-
-        try {
-          // Parse the response to check if it has structured answer
-          const parsed = JSON.parse(result.primary.shortAnswer);
-          if (parsed.questionType && parsed.answer) {
-            structuredAnswer = parsed;
-            questionType = parsed.questionType;
-            answerFormat = parsed.expectedFormat;
-            confidence = parsed.confidence || confidence;
-          }
-        } catch {
-          // Not structured JSON, use legacy format
-        }
 
         await prisma.message.create({
           data: {
@@ -453,23 +429,11 @@ export async function chatRoutes(server: FastifyInstance) {
       if ((effectiveMode === 'EXPERT' || effectiveMode === 'REGULAR') && result.providers) {
         // Save all provider responses (no consensus)
         for (const provider of result.providers) {
-          // Try to extract structured answer from response
-          let structuredAnswer = null;
-          let questionType = null;
+          // Use structured answer from response
+          let structuredAnswer = provider.response.structuredAnswer || null;
+          let questionType = provider.response.questionType || null;
           let answerFormat = null;
           let confidence = provider.response.confidence || null;
-
-          try {
-            const parsed = JSON.parse(provider.response.shortAnswer);
-            if (parsed.questionType && parsed.answer) {
-              structuredAnswer = parsed;
-              questionType = parsed.questionType;
-              answerFormat = parsed.expectedFormat;
-              confidence = parsed.confidence || confidence;
-            }
-          } catch {
-            // Not structured JSON, use legacy format
-          }
 
           await prisma.message.create({
             data: {
@@ -489,22 +453,10 @@ export async function chatRoutes(server: FastifyInstance) {
         }
       } else {
         // Save single response with structured answer
-        let structuredAnswer = null;
-        let questionType = null;
+        let structuredAnswer = result.primary.structuredAnswer || null;
+        let questionType = result.primary.questionType || null;
         let answerFormat = null;
         let confidence = result.primary.confidence || null;
-
-        try {
-          const parsed = JSON.parse(result.primary.shortAnswer);
-          if (parsed.questionType && parsed.answer) {
-            structuredAnswer = parsed;
-            questionType = parsed.questionType;
-            answerFormat = parsed.expectedFormat;
-            confidence = parsed.confidence || confidence;
-          }
-        } catch {
-          // Not structured JSON, use legacy format
-        }
 
         await prisma.message.create({
           data: {

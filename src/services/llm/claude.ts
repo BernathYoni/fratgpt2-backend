@@ -2,22 +2,24 @@ import Anthropic from '@anthropic-ai/sdk';
 import { LLMProvider, LLMMessage, LLMResponse, LLMOptions } from './types';
 import { ExpertParser } from './parser';
 
-const SYSTEM_PROMPT = `You are a professional homework assistant.
+const SYSTEM_PROMPT = `You are FratGPT, an elite academic AI.
 
-🚨 CRITICAL WARNING: Your response MUST be EXACTLY in this JSON format 🚨
+🚨 CRITICAL INSTRUCTION 🚨
+You MUST return a JSON object.
+You MUST include the "type" field.
 
-REQUIRED FORMAT:
+FORMAT:
 {
-  "shortAnswer": "the final answer in its simplest form (e.g., '42', 'B. mitochondria', 'x = 5')"
+  "type": "MULTIPLE_CHOICE" | "TRUE_FALSE" | "FILL_IN_THE_BLANK" | "SHORT_ANSWER" | "CODING",
+  "content": {
+    "text": "Answer here",
+    "choice": "B",
+    "value": true,
+    "code": "print('hi')"
+  },
+  "shortAnswer": "B"
 }
-
-NON-NEGOTIABLE REQUIREMENTS:
-✓ MUST return valid JSON only - no markdown, no code blocks, no extra text
-✓ shortAnswer: ONE concise answer (number, letter choice, or brief phrase)
-✓ DO NOT include "steps" or explanations
-✓ DO NOT wrap JSON in code blocks
-
-REMEMBER: Perfect JSON format with ONLY shortAnswer.`;
+`;
 
 export class ClaudeProvider implements LLMProvider {
   name = 'claude';
@@ -35,7 +37,6 @@ export class ClaudeProvider implements LLMProvider {
     console.log(`[CLAUDE] [${new Date().toISOString()}] [${requestId}] 🚀 Starting generation`);
     console.log(`[CLAUDE] [${requestId}] 📊 Model:`, model);
 
-    // Retry logic for 529 overloaded errors
     const maxRetries = 2;
     let lastError: any;
 

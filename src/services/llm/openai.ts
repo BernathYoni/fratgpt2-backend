@@ -2,22 +2,24 @@ import OpenAI from 'openai';
 import { LLMProvider, LLMMessage, LLMResponse, LLMOptions } from './types';
 import { ExpertParser } from './parser';
 
-const SYSTEM_PROMPT = `You are a professional homework assistant.
+const SYSTEM_PROMPT = `You are FratGPT, an elite academic AI.
 
-🚨 CRITICAL WARNING: Your response MUST be EXACTLY in this JSON format 🚨
+🚨 CRITICAL INSTRUCTION 🚨
+You MUST return a JSON object.
+You MUST include the "type" field.
 
-REQUIRED FORMAT:
+FORMAT:
 {
-  "shortAnswer": "the final answer in its simplest form (e.g., '42', 'B. mitochondria', 'x = 5')"
+  "type": "MULTIPLE_CHOICE" | "TRUE_FALSE" | "FILL_IN_THE_BLANK" | "SHORT_ANSWER" | "CODING",
+  "content": {
+    "text": "Answer here",
+    "choice": "B",
+    "value": true,
+    "code": "print('hi')"
+  },
+  "shortAnswer": "B"
 }
-
-NON-NEGOTIABLE REQUIREMENTS:
-✓ MUST return valid JSON only - no markdown, no code blocks, no extra text
-✓ shortAnswer: ONE concise answer (number, letter choice, or brief phrase)
-✓ DO NOT include "steps" or explanations
-✓ DO NOT wrap JSON in code blocks
-
-REMEMBER: Perfect JSON format with ONLY shortAnswer.`;
+`;
 
 export class OpenAIProvider implements LLMProvider {
   name = 'openai';
@@ -30,10 +32,6 @@ export class OpenAIProvider implements LLMProvider {
   async generate(messages: LLMMessage[], options?: LLMOptions): Promise<LLMResponse> {
     const startTime = Date.now();
     const requestId = options?.requestId || 'SINGLE';
-    // Select model based on mode:
-    // EXPERT: gpt-5.1
-    // REGULAR: gpt-5-mini
-    // Default: gpt-4o
     let model: string;
     if (options?.mode === 'EXPERT') {
       model = 'gpt-5.1';
@@ -46,7 +44,6 @@ export class OpenAIProvider implements LLMProvider {
     console.log(`[OPENAI] [${new Date().toISOString()}] [${requestId}] 🚀 Starting generation`);
     console.log(`[OPENAI] [${requestId}] 📊 Model:`, model);
 
-    // Build messages array
     const openaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: 'system', content: SYSTEM_PROMPT },
     ];
@@ -109,7 +106,6 @@ export class OpenAIProvider implements LLMProvider {
 
     const parsed = await parser.parse(text, 'openai');
     
-    // Extract token usage
     if (completion.usage) {
       parsed.tokenUsage = {
         inputTokens: completion.usage.prompt_tokens || 0,

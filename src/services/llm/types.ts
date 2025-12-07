@@ -44,6 +44,10 @@ export interface LLMResponse {
   warnings?: string[];
   partialFailure?: boolean;
   error?: string;
+
+  // Structured answer fields
+  questionType?: string;
+  structuredAnswer?: any;
 }
 
 export interface LLMProvider {
