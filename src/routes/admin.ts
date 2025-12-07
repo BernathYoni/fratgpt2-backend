@@ -332,4 +332,133 @@ export async function adminRoutes(server: FastifyInstance) {
       return reply.code(500).send({ error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
+
+  /**
+   * GET /admin/logs
+   */
+  server.get('/logs', { preHandler: requireAdmin }, async (request, reply) => {
+    try {
+      const { page = 1, limit = 50 } = request.query as { page?: number; limit?: number };
+      const skip = (Number(page) - 1) * Number(limit);
+
+      // Fetch User Messages (Solves)
+      const userMessages = await prisma.message.findMany({
+        where: { role: 'USER' },
+        include: {
+          chatSession: {
+            include: {
+              user: true,
+            },
+          },
+          attachments: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: Number(limit),
+        skip: skip,
+      });
+
+      const totalLogs = await prisma.message.count({ where: { role: 'USER' } });
+
+      // Enrich with Assistant Responses and Calculate Costs
+      const logs = await Promise.all(userMessages.map(async (msg) => {
+        const nextUserMessage = await prisma.message.findFirst({
+          where: {
+            chatSessionId: msg.chatSessionId,
+            role: 'USER',
+            createdAt: { gt: msg.createdAt },
+          },
+          orderBy: { createdAt: 'asc' },
+        });
+
+        const responses = await prisma.message.findMany({
+          where: {
+            chatSessionId: msg.chatSessionId,
+            role: 'ASSISTANT',
+            createdAt: {
+              gt: msg.createdAt,
+              lt: nextUserMessage ? nextUserMessage.createdAt : undefined,
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        });
+
+        // Calculate Cost
+        let totalCost = 0;
+        const providerCosts: Record<string, number> = {};
+
+        const outputs = responses.map(r => {
+          let cost = 0;
+          const metadata = r.metadata as any;
+          
+          if (metadata && metadata.tokenUsage) {
+             const tokens = metadata.tokenUsage;
+             let modelKey = 'GEMINI_PRO';
+             
+             if (r.provider === 'GEMINI') {
+                modelKey = msg.chatSession.mode === 'FAST' ? 'GEMINI_FLASH' : 'GEMINI_PRO';
+             } else if (r.provider === 'OPENAI') {
+                modelKey = 'OPENAI';
+             } else if (r.provider === 'CLAUDE') {
+                modelKey = 'CLAUDE';
+             }
+             
+             cost = CostCalculator.calculateModelCost(modelKey as any, {
+                inputTokens: tokens.inputTokens || 0,
+                outputTokens: tokens.outputTokens || 0,
+                thinkingTokens: tokens.thinkingTokens || 0
+             });
+             
+             totalCost += cost;
+             providerCosts[r.provider!] = (providerCosts[r.provider!] || 0) + cost;
+          }
+
+          return {
+            id: r.id,
+            provider: r.provider,
+            shortAnswer: r.shortAnswer,
+            confidence: r.confidence,
+            structuredAnswer: r.structuredAnswer,
+            metadata: r.metadata,
+            cost
+          };
+        });
+        
+        return {
+          id: msg.id,
+          createdAt: msg.createdAt,
+          user: {
+            id: msg.chatSession.user.id,
+            email: msg.chatSession.user.email,
+          },
+          mode: msg.chatSession.mode,
+          input: {
+            text: msg.content,
+            images: msg.attachments.map(a => ({
+              id: a.id,
+              source: a.source,
+              hasImage: !!a.imageData,
+              regionData: a.regionData,
+            })),
+          },
+          outputs,
+          totalCost,
+          providerCosts
+        };
+      }));
+
+      return reply.send({
+        logs,
+        pagination: {
+          total: totalLogs,
+          page: Number(page),
+          limit: Number(limit),
+          totalPages: Math.ceil(totalLogs / Number(limit)),
+        }
+      });
+
+    } catch (error) {
+      server.log.error(error);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
 }
