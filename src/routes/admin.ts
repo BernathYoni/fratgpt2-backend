@@ -31,82 +31,116 @@ export async function adminRoutes(server: FastifyInstance) {
       const start = new Date(startDate);
       const end = new Date(endDate);
 
-      const usageAggregation = await prisma.usage.aggregate({
+      // Fetch all assistant messages
+      // We filter for metadata in memory to avoid TS issues with JsonNull
+      const messages = await prisma.message.findMany({
         where: {
-          date: {
-            gte: start,
-            lte: end,
-          },
+          role: 'ASSISTANT',
+          createdAt: { gte: start, lte: end },
         },
-        _sum: {
-          geminiFlashInputTokens: true,
-          geminiFlashOutputTokens: true,
-          geminiProInputTokens: true,
-          geminiProOutputTokens: true,
-          openaiInputTokens: true,
-          openaiOutputTokens: true,
-          claudeInputTokens: true,
-          claudeOutputTokens: true,
-          claudeThinkingTokens: true,
-        },
+        include: {
+          chatSession: {
+            select: { mode: true }
+          }
+        }
       });
 
-      const costs = CostCalculator.calculateTotalCosts({
-        geminiFlashInputTokens: usageAggregation._sum.geminiFlashInputTokens || 0,
-        geminiFlashOutputTokens: usageAggregation._sum.geminiFlashOutputTokens || 0,
-        geminiProInputTokens: usageAggregation._sum.geminiProInputTokens || 0,
-        geminiProOutputTokens: usageAggregation._sum.geminiProOutputTokens || 0,
-        openaiInputTokens: usageAggregation._sum.openaiInputTokens || 0,
-        openaiOutputTokens: usageAggregation._sum.openaiOutputTokens || 0,
-        claudeInputTokens: usageAggregation._sum.claudeInputTokens || 0,
-        claudeOutputTokens: usageAggregation._sum.claudeOutputTokens || 0,
-        claudeThinkingTokens: usageAggregation._sum.claudeThinkingTokens || 0,
-      });
+      // Initialize aggregators
+      const breakdown: Record<string, { 
+        totalCost: number, 
+        totalTokens: number, 
+        models: Record<string, { inputTokens: number, outputTokens: number, cost: number }> 
+      }> = {
+        gemini: { totalCost: 0, totalTokens: 0, models: {} },
+        openai: { totalCost: 0, totalTokens: 0, models: {} },
+        claude: { totalCost: 0, totalTokens: 0, models: {} },
+      };
 
-      const geminiTotalCost = costs.geminiFlash.cost + costs.geminiPro.cost;
-      const geminiInputTokens = Number(costs.geminiFlash.inputTokens) + Number(costs.geminiPro.inputTokens);
-      const geminiOutputTokens = Number(costs.geminiFlash.outputTokens) + Number(costs.geminiPro.outputTokens);
+      let totalCost = 0;
 
-      const totalCost = costs.total.cost;
-      const geminiPercent = totalCost > 0 ? (geminiTotalCost / totalCost) * 100 : 0;
-      const openaiPercent = totalCost > 0 ? (costs.openai.cost / totalCost) * 100 : 0;
-      const claudePercent = totalCost > 0 ? (costs.claude.cost / totalCost) * 100 : 0;
+      for (const msg of messages) {
+        const metadata = msg.metadata as any;
+        if (!metadata?.tokenUsage || !msg.provider) continue;
+
+        const tokens = metadata.tokenUsage;
+        const providerKey = msg.provider.toLowerCase();
+        const mode = msg.chatSession.mode;
+        
+        let modelName = 'Unknown';
+        let costKey: any = 'GEMINI_PRO';
+
+        // Determine Model Name and Cost Key based on Mode + Provider
+        if (msg.provider === 'GEMINI') {
+          if (mode === 'FAST') {
+            modelName = 'Gemini 2.0 Flash';
+            costKey = 'GEMINI_FLASH';
+          } else if (mode === 'REGULAR') {
+            modelName = 'Gemini 2.5 Pro';
+            costKey = 'GEMINI_PRO';
+          } else { // EXPERT
+            modelName = 'Gemini 3.0 Pro (Exp)';
+            costKey = 'GEMINI_PRO'; // Assuming Pro pricing for now
+          }
+        } else if (msg.provider === 'OPENAI') {
+          if (mode === 'REGULAR') {
+            modelName = 'GPT-5 Mini';
+            costKey = 'OPENAI'; // TODO: Add specific Mini pricing
+          } else { // EXPERT
+            modelName = 'GPT-5.1';
+            costKey = 'OPENAI';
+          }
+        } else if (msg.provider === 'CLAUDE') {
+          modelName = 'Claude 3.5 Sonnet'; // Orchestrator says 4.5, let's label it 3.5/4.5
+          costKey = 'CLAUDE';
+        }
+
+        // Calculate Cost
+        const cost = CostCalculator.calculateModelCost(costKey, {
+          inputTokens: tokens.inputTokens || 0,
+          outputTokens: tokens.outputTokens || 0,
+          thinkingTokens: tokens.thinkingTokens || 0
+        });
+
+        // Update Aggregates
+        if (!breakdown[providerKey]) continue;
+
+        if (!breakdown[providerKey].models[modelName]) {
+          breakdown[providerKey].models[modelName] = { inputTokens: 0, outputTokens: 0, cost: 0 };
+        }
+
+        const modelStats = breakdown[providerKey].models[modelName];
+        modelStats.inputTokens += (tokens.inputTokens || 0);
+        modelStats.outputTokens += (tokens.outputTokens || 0);
+        modelStats.cost += cost;
+
+        breakdown[providerKey].totalCost += cost;
+        breakdown[providerKey].totalTokens += (tokens.inputTokens || 0) + (tokens.outputTokens || 0);
+        
+        totalCost += cost;
+      }
+
+      // Format for Frontend
+      const providers = {
+        gemini: {
+          cost: breakdown.gemini.totalCost,
+          percentage: totalCost > 0 ? (breakdown.gemini.totalCost / totalCost) * 100 : 0,
+          models: breakdown.gemini.models
+        },
+        openai: {
+          cost: breakdown.openai.totalCost,
+          percentage: totalCost > 0 ? (breakdown.openai.totalCost / totalCost) * 100 : 0,
+          models: breakdown.openai.models
+        },
+        claude: {
+          cost: breakdown.claude.totalCost,
+          percentage: totalCost > 0 ? (breakdown.claude.totalCost / totalCost) * 100 : 0,
+          models: breakdown.claude.models
+        }
+      };
 
       return reply.send({
         totalCost,
-        providers: {
-          gemini: {
-            cost: geminiTotalCost,
-            percentage: geminiPercent,
-            inputTokens: geminiInputTokens,
-            outputTokens: geminiOutputTokens,
-            details: {
-              flash: {
-                cost: costs.geminiFlash.cost,
-                inputTokens: Number(costs.geminiFlash.inputTokens),
-                outputTokens: Number(costs.geminiFlash.outputTokens),
-              },
-              pro: {
-                cost: costs.geminiPro.cost,
-                inputTokens: Number(costs.geminiPro.inputTokens),
-                outputTokens: Number(costs.geminiPro.outputTokens),
-              }
-            }
-          },
-          openai: {
-            cost: costs.openai.cost,
-            percentage: openaiPercent,
-            inputTokens: Number(costs.openai.inputTokens),
-            outputTokens: Number(costs.openai.outputTokens),
-          },
-          claude: {
-            cost: costs.claude.cost,
-            percentage: claudePercent,
-            inputTokens: Number(costs.claude.inputTokens),
-            outputTokens: Number(costs.claude.outputTokens),
-            thinkingTokens: Number(costs.claude.thinkingTokens || 0),
-          }
-        }
+        providers
       });
 
     } catch (error) {
