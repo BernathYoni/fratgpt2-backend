@@ -348,6 +348,7 @@ export async function adminRoutes(server: FastifyInstance) {
           chatSession: {
             include: {
               user: true,
+              interactions: true,
             },
           },
           attachments: true,
@@ -431,6 +432,9 @@ export async function adminRoutes(server: FastifyInstance) {
             email: msg.chatSession.user.email,
           },
           mode: msg.chatSession.mode,
+          sourceUrl: msg.chatSession.sourceUrl,
+          ipAddress: msg.chatSession.ipAddress,
+          interactions: msg.chatSession.interactions,
           input: {
             text: msg.content,
             images: msg.attachments.map(a => ({

@@ -68,12 +68,27 @@ model ChatSession {
   // Smart cache for region detection
   cachedRegionData    Json?       // Cached region detection from first capture
   skipRegionDetection Boolean     @default(false) // Skip detection on follow-ups
+  sourceUrl           String?     @db.Text
+  ipAddress           String?
 
   user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages            Message[]
+  interactions        Interaction[]
 
   @@index([userId])
   @@index([createdAt])
+}
+
+model Interaction {
+  id            String      @id @default(uuid())
+  chatSessionId String
+  type          String      // 'TAB_SWITCH', etc.
+  metadata      Json?       // { provider: 'CLAUDE' }
+  createdAt     DateTime    @default(now())
+
+  chatSession   ChatSession @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+
+  @@index([chatSessionId])
 }
 
 enum ChatMode {

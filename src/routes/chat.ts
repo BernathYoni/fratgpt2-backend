@@ -17,6 +17,7 @@ const startChatSchema = z.object({
   message: z.string().min(1),
   imageData: z.string().optional(), // base64
   captureSource: z.enum(['SCREEN', 'SNIP']).optional(),
+  sourceUrl: z.string().optional(),
 });
 
 const sendMessageSchema = z.object({
@@ -24,6 +25,11 @@ const sendMessageSchema = z.object({
   imageData: z.string().optional(),
   captureSource: z.enum(['SCREEN', 'SNIP']).optional(),
   mode: z.enum(['REGULAR', 'FAST', 'EXPERT']).optional(), // Allow mode switching for new captures
+});
+
+const interactionSchema = z.object({
+  type: z.string(),
+  metadata: z.record(z.any()).optional(),
 });
 
 export async function chatRoutes(server: FastifyInstance) {
@@ -41,13 +47,15 @@ export async function chatRoutes(server: FastifyInstance) {
 
       const parseStart = Date.now();
       console.log(`[CHAT/START] [${new Date().toISOString()}] 📦 Parsing request body...`);
-      const { mode, message, imageData, captureSource } = startChatSchema.parse(request.body);
+      const { mode, message, imageData, captureSource, sourceUrl } = startChatSchema.parse(request.body);
+      const ipAddress = (request.headers['x-forwarded-for'] as string) || request.ip;
+
       console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ Parsed in ${Date.now() - parseStart}ms`);
       console.log('[CHAT/START] Mode:', mode);
       console.log('[CHAT/START] Message:', message);
       console.log('[CHAT/START] Has image:', !!imageData);
-      console.log('[CHAT/START] Image size:', imageData ? `${(imageData.length / 1024).toFixed(2)} KB` : 'N/A');
-      console.log('[CHAT/START] Capture source:', captureSource);
+      console.log('[CHAT/START] Source URL:', sourceUrl || 'N/A');
+      console.log('[CHAT/START] IP Address:', ipAddress);
 
       // Check rate limits and mode restrictions
       const limitCheckStart = Date.now();
@@ -103,6 +111,8 @@ export async function chatRoutes(server: FastifyInstance) {
           userId,
           mode: mode as ChatMode,
           title: message.substring(0, 50),
+          sourceUrl,
+          ipAddress,
         },
       });
       console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ Session created in ${Date.now() - dbStart}ms, ID: ${session.id}`);
@@ -491,6 +501,39 @@ export async function chatRoutes(server: FastifyInstance) {
       });
 
       return reply.send(updatedSession);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return reply.code(400).send({ error: 'Invalid input', details: error.errors });
+      }
+      server.log.error(error);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // POST /chat/:sessionId/interaction - Log a user interaction (e.g. tab switch)
+  server.post('/:sessionId/interaction', async (request, reply) => {
+    try {
+      const { userId } = await authenticate(request);
+      const { sessionId } = request.params as { sessionId: string };
+      const { type, metadata } = interactionSchema.parse(request.body);
+
+      const session = await prisma.chatSession.findUnique({
+        where: { id: sessionId },
+      });
+
+      if (!session || session.userId !== userId) {
+        return reply.code(404).send({ error: 'Session not found' });
+      }
+
+      await prisma.interaction.create({
+        data: {
+          chatSessionId: session.id,
+          type,
+          metadata: metadata || undefined,
+        },
+      });
+
+      return reply.send({ success: true });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return reply.code(400).send({ error: 'Invalid input', details: error.errors });
