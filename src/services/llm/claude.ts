@@ -18,7 +18,8 @@ FORMAT:
     "value": true,
     "code": "print('hi')"
   },
-  "shortAnswer": "B"
+  "shortAnswer": "B",
+  "explanation": "Concise explanation of the solution (max 100 words)."
 }
 `;
 
