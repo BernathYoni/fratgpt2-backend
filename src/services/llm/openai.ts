@@ -14,6 +14,7 @@ FORMAT:
   "content": {
     "text": "Answer here",
     "choice": "B",
+    "options": ["A. Option 1", "B. Option 2", "C. Option 3"], // REQUIRED for MULTIPLE_CHOICE
     "value": true,
     "code": "print('hi')"
   },
