@@ -12,13 +12,13 @@ FORMAT:
 {
   "type": "MULTIPLE_CHOICE" | "TRUE_FALSE" | "FILL_IN_THE_BLANK" | "SHORT_ANSWER" | "CODING",
   "content": {
-    "text": "Answer here",
+    "text": "Answer here (1-2 sentences for SHORT_ANSWER)",
     "choice": "B",
     "options": ["A. Option 1", "B. Option 2", "C. Option 3"], // REQUIRED for MULTIPLE_CHOICE
     "value": true,
     "code": "print('hi')"
   },
-  "shortAnswer": "B",
+  "shortAnswer": "Concise 1-2 sentence answer",
   "explanation": "Concise explanation of the solution (max 100 words)."
 }
 `;
