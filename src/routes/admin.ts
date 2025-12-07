@@ -334,6 +334,66 @@ export async function adminRoutes(server: FastifyInstance) {
   });
 
   /**
+   * GET /admin/users
+   */
+  server.get('/users', { preHandler: requireAdmin }, async (request, reply) => {
+    try {
+      const { page = 1, limit = 50 } = request.query as { page?: number; limit?: number };
+      const skip = (Number(page) - 1) * Number(limit);
+
+      const users = await prisma.user.findMany({
+        include: {
+          subscriptions: {
+            where: { status: 'ACTIVE' },
+            take: 1,
+          },
+          usage: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: Number(limit),
+        skip: skip,
+      });
+
+      const totalUsers = await prisma.user.count();
+
+      const userList = users.map(user => {
+        const activeSub = user.subscriptions[0];
+        const plan = activeSub ? activeSub.plan : 'FREE';
+        const planSince = activeSub ? activeSub.createdAt : user.createdAt;
+        
+        // Calculate lifetime stats
+        const lifetimeCost = user.usage.reduce((sum, u) => sum + (u.totalMonthlyCost || 0), 0);
+        const lifetimeSolves = user.usage.reduce((sum, u) => sum + (u.solvesUsed || 0), 0);
+
+        return {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          createdAt: user.createdAt,
+          plan,
+          planSince,
+          lifetimeCost,
+          lifetimeSolves,
+        };
+      });
+
+      return reply.send({
+        users: userList,
+        pagination: {
+          total: totalUsers,
+          page: Number(page),
+          limit: Number(limit),
+          totalPages: Math.ceil(totalUsers / Number(limit)),
+        }
+      });
+
+    } catch (error) {
+      server.log.error(error);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  /**
    * GET /admin/logs
    */
   server.get('/logs', { preHandler: requireAdmin }, async (request, reply) => {
