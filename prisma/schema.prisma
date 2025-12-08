@@ -44,6 +44,8 @@ model Affiliate {
   
   stripePromoId  String?  // ID of the promotion code in Stripe
   stripeCouponId String?  // ID of the underlying coupon in Stripe
+  
+  archived       Boolean  @default(false)
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
