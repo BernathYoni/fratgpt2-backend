@@ -8,6 +8,7 @@ import { billingRoutes } from './routes/billing';
 import { webhookRoutes } from './routes/webhooks';
 import { usageRoutes } from './routes/usage';
 import { adminRoutes } from './routes/admin';
+import { affiliateRoutes } from './routes/affiliates';
 
 const server = Fastify({
   logger: true,

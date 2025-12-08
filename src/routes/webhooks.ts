@@ -128,7 +128,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session, server:
       });
       server.log.info(`[WEBHOOK-CHECKOUT] ✓ Affiliate stats updated`);
     } catch (err) {
-      server.log.error(`[WEBHOOK-CHECKOUT] ❌ Failed to link affiliate:`, err);
+      server.log.error({ err }, '[WEBHOOK-CHECKOUT] ❌ Failed to link affiliate');
     }
   }
 

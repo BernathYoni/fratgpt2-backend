@@ -67,7 +67,7 @@ export async function affiliateRoutes(server: FastifyInstance) {
       server.log.info(`[ADMIN/AFFILIATES] Affiliate ${affiliate.name} created with code ${affiliate.code}`);
       return reply.code(201).send(affiliate);
     } catch (error) {
-      server.log.error('[ADMIN/AFFILIATES] Error creating affiliate:', error);
+      server.log.error({ err: error }, '[ADMIN/AFFILIATES] Error creating affiliate');
       if (error instanceof z.ZodError) {
         return reply.code(400).send({ error: 'Invalid input', details: error.errors });
       }
@@ -102,15 +102,15 @@ export async function affiliateRoutes(server: FastifyInstance) {
       server.log.info(`[ADMIN/AFFILIATES] Found ${result.length} affiliates`);
       return reply.send(result);
     } catch (error) {
-      server.log.error('[ADMIN/AFFILIATES] Error fetching affiliates:', error);
+      server.log.error({ err: error }, '[ADMIN/AFFILIATES] Error fetching affiliates');
       return reply.code(500).send({ error: 'Internal server error' });
     }
   });
 
   // POST /admin/affiliates/:id/mark-paid - Mark an affiliate as paid
   server.post('/:id/mark-paid', { preHandler: requireAdmin }, async (request, reply) => {
+    const { id } = request.params as { id: string };
     try {
-      const { id } = request.params as { id: string };
       server.log.info(`[ADMIN/AFFILIATES] Marking affiliate ${id} as paid`);
 
       const affiliate = await prisma.affiliate.findUnique({ where: { id } });
@@ -128,7 +128,7 @@ export async function affiliateRoutes(server: FastifyInstance) {
       server.log.info(`[ADMIN/AFFILIATES] Affiliate ${id} marked paid. New amountPaid: ${updatedAffiliate.amountPaid}`);
       return reply.send(updatedAffiliate);
     } catch (error) {
-      server.log.error(`[ADMIN/AFFILIATES] Error marking affiliate ${id} paid:`, error);
+      server.log.error({ err: error }, `[ADMIN/AFFILIATES] Error marking affiliate ${id} paid`);
       return reply.code(500).send({ error: 'Internal server error' });
     }
   });
