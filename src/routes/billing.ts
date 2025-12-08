@@ -16,6 +16,7 @@ const PRICE_TO_PLAN: Record<string, 'BASIC' | 'PRO'> = {
 
 const checkoutSchema = z.object({
   priceId: z.string(),
+  affiliateCode: z.string().optional(),
 });
 
 export async function billingRoutes(server: FastifyInstance) {
@@ -26,8 +27,9 @@ export async function billingRoutes(server: FastifyInstance) {
       const { userId } = await authenticate(request);
       server.log.info(`[BILLING-CHECKOUT] User ID: ${userId}`);
 
-      const { priceId } = checkoutSchema.parse(request.body);
+      const { priceId, affiliateCode } = checkoutSchema.parse(request.body);
       server.log.info(`[BILLING-CHECKOUT] Price ID: ${priceId}`);
+      if (affiliateCode) server.log.info(`[BILLING-CHECKOUT] Affiliate Code: ${affiliateCode}`);
 
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (!user) {
@@ -56,6 +58,21 @@ export async function billingRoutes(server: FastifyInstance) {
         server.log.info(`[BILLING-CHECKOUT] ✓ Using existing customer: ${customerId}`);
       }
 
+      // Resolve affiliate
+      let discounts = undefined;
+      let metadata: any = { userId };
+
+      if (affiliateCode) {
+        const affiliate = await prisma.affiliate.findUnique({ where: { code: affiliateCode } });
+        if (affiliate && affiliate.stripePromoId) {
+          server.log.info(`[BILLING-CHECKOUT] ✓ Applying affiliate promo: ${affiliate.code}`);
+          discounts = [{ promotion_code: affiliate.stripePromoId }];
+          metadata.affiliateId = affiliate.id;
+        } else {
+          server.log.warn(`[BILLING-CHECKOUT] ⚠️ Affiliate code not found or missing promo ID: ${affiliateCode}`);
+        }
+      }
+
       // Create checkout session
       server.log.info('[BILLING-CHECKOUT] Creating Stripe checkout session...');
       const successUrl = `${process.env.FRONTEND_URL}/subscription/success?session_id={CHECKOUT_SESSION_ID}`;
@@ -75,7 +92,9 @@ export async function billingRoutes(server: FastifyInstance) {
         mode: 'subscription',
         success_url: successUrl,
         cancel_url: cancelUrl,
-        metadata: { userId },
+        metadata: metadata,
+        discounts: discounts,
+        allow_promotion_codes: !discounts, // Allow manual codes only if no affiliate discount is forced
       });
 
       server.log.info(`[BILLING-CHECKOUT] ✓ Checkout session created: ${session.id}`);

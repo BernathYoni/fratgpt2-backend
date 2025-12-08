@@ -96,7 +96,10 @@ export async function webhookRoutes(server: FastifyInstance) {
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session, server: FastifyInstance) {
   const userId = session.metadata?.userId;
+  const affiliateId = session.metadata?.affiliateId;
+  
   server.log.info(`[WEBHOOK-CHECKOUT] User ID from metadata: ${userId || 'NONE'}`);
+  server.log.info(`[WEBHOOK-CHECKOUT] Affiliate ID from metadata: ${affiliateId || 'NONE'}`);
   server.log.info(`[WEBHOOK-CHECKOUT] Session ID: ${session.id}`);
   server.log.info(`[WEBHOOK-CHECKOUT] Customer ID: ${session.customer}`);
   server.log.info(`[WEBHOOK-CHECKOUT] Payment status: ${session.payment_status}`);
@@ -104,6 +107,29 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session, server:
   if (!userId) {
     server.log.warn('[WEBHOOK-CHECKOUT] ⚠️ No userId in metadata, skipping');
     return;
+  }
+
+  if (affiliateId) {
+    try {
+      server.log.info(`[WEBHOOK-CHECKOUT] Linking user ${userId} to affiliate ${affiliateId}`);
+      
+      // Update User with affiliate relation
+      await prisma.user.update({
+        where: { id: userId },
+        data: { affiliateId }
+      });
+
+      // Increment affiliate stats
+      await prisma.affiliate.update({
+        where: { id: affiliateId },
+        data: {
+          signups: { increment: 1 }
+        }
+      });
+      server.log.info(`[WEBHOOK-CHECKOUT] ✓ Affiliate stats updated`);
+    } catch (err) {
+      server.log.error(`[WEBHOOK-CHECKOUT] ❌ Failed to link affiliate:`, err);
+    }
   }
 
   server.log.info(`[WEBHOOK-CHECKOUT] ✅ Checkout completed for user ${userId}`);
