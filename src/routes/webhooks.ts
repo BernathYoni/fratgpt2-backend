@@ -166,6 +166,7 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription, serve
   // Affiliate Tracking Logic
   // Check if this is a new upgrade (FREE -> BASIC/PRO)
   // We rely on the user's current subscription in DB (before update) being FREE or null
+  // TRIGGER DEPLOYMENT COMMENT
   const currentDbPlan = user.subscriptions[0]?.plan || 'FREE';
   
   if (user.affiliateId && (plan === 'BASIC' || plan === 'PRO') && currentDbPlan === 'FREE') {
