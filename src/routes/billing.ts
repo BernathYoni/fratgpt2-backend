@@ -36,7 +36,10 @@ export async function billingRoutes(server: FastifyInstance) {
       server.log.info(`[BILLING-CHECKOUT] Price ID: ${priceId}`);
       if (affiliateCode) server.log.info(`[BILLING-CHECKOUT] Affiliate Code: ${affiliateCode}`);
 
-      const user = await prisma.user.findUnique({ where: { id: userId } });
+      const user = await prisma.user.findUnique({ 
+        where: { id: userId },
+        include: { affiliate: true } // Include affiliate relation
+      });
       if (!user) {
         server.log.error(`[BILLING-CHECKOUT] ❌ User not found: ${userId}`);
         return reply.code(404).send({ error: 'User not found' });
@@ -67,15 +70,32 @@ export async function billingRoutes(server: FastifyInstance) {
       let discounts = undefined;
       let metadata: any = { userId };
 
+      let targetAffiliate = null;
+
+      // 1. Try explicit affiliate code from request
       if (affiliateCode) {
-        const affiliate = await prisma.affiliate.findUnique({ where: { code: affiliateCode } });
-        if (affiliate && affiliate.stripePromoId) {
-          server.log.info(`[BILLING-CHECKOUT] ✓ Applying affiliate promo: ${affiliate.code}`);
-          discounts = [{ promotion_code: affiliate.stripePromoId }];
-          metadata.affiliateId = affiliate.id;
+        targetAffiliate = await prisma.affiliate.findUnique({ where: { code: affiliateCode } });
+        if (!targetAffiliate) {
+          server.log.warn(`[BILLING-CHECKOUT] ⚠️ Affiliate code not found: ${affiliateCode}`);
         } else {
-          server.log.warn(`[BILLING-CHECKOUT] ⚠️ Affiliate code not found or missing promo ID: ${affiliateCode}`);
+          server.log.info(`[BILLING-CHECKOUT] ✓ Found affiliate from code: ${targetAffiliate.code}`);
         }
+      } 
+      
+      // 2. Fallback to user's linked affiliate
+      if (!targetAffiliate && user.affiliate) {
+        targetAffiliate = user.affiliate;
+        server.log.info(`[BILLING-CHECKOUT] ✓ Using linked affiliate: ${targetAffiliate.code}`);
+      }
+
+      // Apply discount if affiliate has a promo ID
+      if (targetAffiliate && targetAffiliate.stripePromoId) {
+        server.log.info(`[BILLING-CHECKOUT] ✓ Applying affiliate promo: ${targetAffiliate.stripePromoId}`);
+        discounts = [{ promotion_code: targetAffiliate.stripePromoId }];
+        metadata.affiliateId = targetAffiliate.id;
+      } else if (targetAffiliate) {
+        server.log.warn(`[BILLING-CHECKOUT] ⚠️ Affiliate ${targetAffiliate.code} has no Stripe Promo ID`);
+        metadata.affiliateId = targetAffiliate.id; // Still track it in metadata even if no discount
       }
 
       // Create checkout session

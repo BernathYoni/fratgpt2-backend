@@ -6,6 +6,7 @@ import { hashPassword, verifyPassword, authenticate } from '../utils/auth';
 const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
+  affiliateCode: z.string().optional(),
 });
 
 const loginSchema = z.object({
@@ -18,14 +19,30 @@ export async function authRoutes(server: FastifyInstance) {
   server.post('/register', async (request, reply) => {
     try {
       server.log.info('[AUTH-REGISTER] 📝 New registration request');
-      const { email, password } = registerSchema.parse(request.body);
+      const { email, password, affiliateCode } = registerSchema.parse(request.body);
       server.log.info(`[AUTH-REGISTER] Email: ${email}`);
+      if (affiliateCode) server.log.info(`[AUTH-REGISTER] Affiliate Code: ${affiliateCode}`);
 
       // Check if user exists
       const existing = await prisma.user.findUnique({ where: { email } });
       if (existing) {
         server.log.warn(`[AUTH-REGISTER] ❌ Email already exists: ${email}`);
         return reply.code(400).send({ error: 'Email already registered' });
+      }
+
+      // Resolve affiliate
+      let affiliateId = undefined;
+      if (affiliateCode) {
+        const affiliate = await prisma.affiliate.findUnique({ where: { code: affiliateCode } });
+        if (affiliate) {
+          affiliateId = affiliate.id;
+          // Increment signups count for the affiliate (Free account creation)
+          await prisma.affiliate.update({
+            where: { id: affiliate.id },
+            data: { signups: { increment: 1 } }
+          });
+          server.log.info(`[AUTH-REGISTER] ✓ Linked to affiliate: ${affiliate.name}`);
+        }
       }
 
       // Create user
@@ -35,6 +52,7 @@ export async function authRoutes(server: FastifyInstance) {
         data: {
           email,
           passwordHash,
+          affiliateId, // Link user to affiliate
           subscriptions: {
             create: {
               plan: 'FREE',
