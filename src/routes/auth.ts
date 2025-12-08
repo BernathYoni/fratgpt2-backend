@@ -36,11 +36,6 @@ export async function authRoutes(server: FastifyInstance) {
         const affiliate = await prisma.affiliate.findUnique({ where: { code: affiliateCode } });
         if (affiliate) {
           affiliateId = affiliate.id;
-          // Increment signups count for the affiliate (Free account creation)
-          await prisma.affiliate.update({
-            where: { id: affiliate.id },
-            data: { signups: { increment: 1 } }
-          });
           server.log.info(`[AUTH-REGISTER] ✓ Linked to affiliate: ${affiliate.name}`);
         }
       }
