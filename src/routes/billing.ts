@@ -105,7 +105,7 @@ export async function billingRoutes(server: FastifyInstance) {
       server.log.info(`[BILLING-CHECKOUT] Success URL: ${successUrl}`);
       server.log.info(`[BILLING-CHECKOUT] Cancel URL: ${cancelUrl}`);
 
-      const session = await stripe.checkout.sessions.create({
+      const sessionParams: Stripe.Checkout.SessionCreateParams = {
         customer: customerId,
         payment_method_types: ['card'],
         line_items: [
@@ -118,9 +118,15 @@ export async function billingRoutes(server: FastifyInstance) {
         success_url: successUrl,
         cancel_url: cancelUrl,
         metadata: metadata,
-        discounts: discounts,
-        allow_promotion_codes: !discounts, // Allow manual codes only if no affiliate discount is forced
-      });
+      };
+
+      if (discounts) {
+        sessionParams.discounts = discounts;
+      } else {
+        sessionParams.allow_promotion_codes = true;
+      }
+
+      const session = await stripe.checkout.sessions.create(sessionParams);
 
       server.log.info(`[BILLING-CHECKOUT] ✓ Checkout session created: ${session.id}`);
       server.log.info(`[BILLING-CHECKOUT] Redirect URL: ${session.url}`);
