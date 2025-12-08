@@ -52,8 +52,16 @@ export class CostCalculator {
       INPUT: 1.25,   // $1.25 per 1M input tokens (Gemini 2.5 Pro)
       OUTPUT: 5.00,  // $5.00 per 1M output tokens
     },
-    OPENAI: {
-      INPUT: 1.25,   // $1.25 per 1M input tokens (GPT-5 / GPT-5.1 pricing)
+    GEMINI_EXPERT: {
+      INPUT: 10.00,  // $10.00 per 1M input tokens (Gemini 3.0 Pro)
+      OUTPUT: 40.00, // $40.00 per 1M output tokens
+    },
+    OPENAI_MINI: {
+      INPUT: 0.25,   // $0.25 per 1M input tokens (GPT-5 mini)
+      OUTPUT: 2.00,  // $2.00 per 1M output tokens
+    },
+    OPENAI_PRO: {
+      INPUT: 1.25,   // $1.25 per 1M input tokens (GPT-5.1)
       OUTPUT: 10.00, // $10.00 per 1M output tokens
     },
     CLAUDE: {
@@ -93,8 +101,8 @@ export class CostCalculator {
     model: 'gpt-4o' | 'claude-3.5-sonnet',
     tokens: TokenCosts
   ): { totalCost: number } {
-    const modelKey = model === 'gpt-4o' ? 'OPENAI' : 'CLAUDE';
-    const cost = this.calculateModelCost(modelKey, tokens);
+    const modelKey = model === 'gpt-4o' ? 'OPENAI_PRO' : 'CLAUDE';
+    const cost = this.calculateModelCost(modelKey as any, tokens);
     return { totalCost: cost };
   }
 
@@ -102,10 +110,18 @@ export class CostCalculator {
    * Calculate cost for a specific model
    */
   static calculateModelCost(
-    model: 'GEMINI_FLASH' | 'GEMINI_PRO' | 'OPENAI' | 'CLAUDE',
+    model: 'GEMINI_FLASH' | 'GEMINI_PRO' | 'GEMINI_EXPERT' | 'OPENAI_MINI' | 'OPENAI_PRO' | 'CLAUDE',
     tokens: TokenCosts
   ): number {
-    const prices = this.PRICES[model];
+    // Fallback for old keys if necessary or just strict typing
+    const prices = this.PRICES[model as keyof typeof CostCalculator.PRICES]; 
+    
+    if (!prices) {
+        // Fallback for legacy 'OPENAI' key if passed dynamically
+        if (model === 'OPENAI' as any) return this.calculateModelCost('OPENAI_PRO', tokens);
+        return 0;
+    }
+
     const inputTokens = Number(tokens.inputTokens);
     const outputTokens = Number(tokens.outputTokens);
     const thinkingTokens = Number(tokens.thinkingTokens || 0);
@@ -145,7 +161,10 @@ export class CostCalculator {
       outputTokens: data.geminiProOutputTokens,
     });
 
-    const openaiCost = this.calculateModelCost('OPENAI', {
+    // Note: Usage table aggregates all OpenAI tokens into one field.
+    // We default to PRO pricing to be safe/conservative, or because most traffic might be Expert?
+    // Actually, if we can't distinguish, we should probably stick to the previous behavior (High price).
+    const openaiCost = this.calculateModelCost('OPENAI_PRO', {
       inputTokens: data.openaiInputTokens,
       outputTokens: data.openaiOutputTokens,
     });

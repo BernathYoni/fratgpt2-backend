@@ -79,18 +79,18 @@ export async function adminRoutes(server: FastifyInstance) {
             costKey = 'GEMINI_PRO';
           } else { // EXPERT
             modelName = 'Gemini 3.0 Pro (Exp)';
-            costKey = 'GEMINI_PRO'; // Assuming Pro pricing for now
+            costKey = 'GEMINI_EXPERT';
           }
         } else if (msg.provider === 'OPENAI') {
           if (mode === 'REGULAR') {
             modelName = 'GPT-5 Mini';
-            costKey = 'OPENAI'; // TODO: Add specific Mini pricing
+            costKey = 'OPENAI_MINI';
           } else { // EXPERT
             modelName = 'GPT-5.1';
-            costKey = 'OPENAI';
+            costKey = 'OPENAI_PRO';
           }
         } else if (msg.provider === 'CLAUDE') {
-          modelName = 'Claude 3.5 Sonnet'; // Orchestrator says 4.5, let's label it 3.5/4.5
+          modelName = 'Claude Sonnet 4.5';
           costKey = 'CLAUDE';
         }
 
@@ -536,9 +536,15 @@ export async function adminRoutes(server: FastifyInstance) {
              let modelKey = 'GEMINI_PRO';
              
              if (r.provider === 'GEMINI') {
-                modelKey = msg.chatSession.mode === 'FAST' ? 'GEMINI_FLASH' : 'GEMINI_PRO';
+                if (msg.chatSession.mode === 'FAST') {
+                  modelKey = 'GEMINI_FLASH';
+                } else if (msg.chatSession.mode === 'REGULAR') {
+                  modelKey = 'GEMINI_PRO';
+                } else {
+                  modelKey = 'GEMINI_EXPERT';
+                }
              } else if (r.provider === 'OPENAI') {
-                modelKey = 'OPENAI';
+                modelKey = msg.chatSession.mode === 'REGULAR' ? 'OPENAI_MINI' : 'OPENAI_PRO';
              } else if (r.provider === 'CLAUDE') {
                 modelKey = 'CLAUDE';
              }
