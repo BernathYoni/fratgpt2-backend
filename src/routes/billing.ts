@@ -22,12 +22,17 @@ const checkoutSchema = z.object({
 export async function billingRoutes(server: FastifyInstance) {
   // POST /billing/create-checkout-session
   server.post('/create-checkout-session', async (request, reply) => {
+    server.log.info('[BILLING-CHECKOUT] 📥 Received request to /create-checkout-session'); // <--- Added this
     try {
-      server.log.info('[BILLING-CHECKOUT] 💳 New checkout session request');
+      server.log.info('[BILLING-CHECKOUT] 💳 Validating authentication...');
       const { userId } = await authenticate(request);
       server.log.info(`[BILLING-CHECKOUT] User ID: ${userId}`);
 
-      const { priceId, affiliateCode } = checkoutSchema.parse(request.body);
+      server.log.info('[BILLING-CHECKOUT] 🔍 Parsing request body...');
+      const body = request.body;
+      server.log.info({ body }, '[BILLING-CHECKOUT] Request body content'); // Log entire body
+
+      const { priceId, affiliateCode } = checkoutSchema.parse(body);
       server.log.info(`[BILLING-CHECKOUT] Price ID: ${priceId}`);
       if (affiliateCode) server.log.info(`[BILLING-CHECKOUT] Affiliate Code: ${affiliateCode}`);
 
