@@ -52,7 +52,7 @@ export async function affiliateRoutes(server: FastifyInstance) {
         stripePromo = await stripe.promotionCodes.create({
           coupon: baseCouponId, // Link to your pre-configured free trial coupon
           code: affiliateCode,
-          max_redemptions: 1000, // Or unlimited, depends on business logic
+          // max_redemptions: 1000, // Removed to inherit limits from the coupon itself
           active: true,
         });
         server.log.info(`[ADMIN/AFFILIATES] Stripe Promotion Code created: ${stripePromo.id}`);
