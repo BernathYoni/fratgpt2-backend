@@ -16,7 +16,8 @@ export async function webhookRoutes(server: FastifyInstance) {
     let event: Stripe.Event;
 
     try {
-      // Use the rawBody buffer attached by the fastify-raw-body plugin
+      // Use the rawBody buffer attached by the fastify-raw-body plugin for webhook verification
+
       const rawBody = (request as any).rawBody;
       
       if (!rawBody) {
