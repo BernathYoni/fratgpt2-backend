@@ -43,15 +43,25 @@ export async function affiliateRoutes(server: FastifyInstance) {
       // This part would ideally be set up once, and we just create Promotion Codes linking to it.
       // Let's use a dummy ID for now and note that a Stripe Coupon must exist.
       const baseCouponId = process.env.STRIPE_AFFILIATE_COUPON_ID || 'dummy_affiliate_coupon_id'; // Configure this env var
+      
+      server.log.info(`[ADMIN/AFFILIATES] Using baseCouponId: ${baseCouponId}`);
 
       // Create Stripe Promotion Code
-      const stripePromo = await stripe.promotionCodes.create({
-        coupon: baseCouponId, // Link to your pre-configured free trial coupon
-        code: affiliateCode,
-        max_redemptions: 1000, // Or unlimited, depends on business logic
-        active: true,
-      });
-      server.log.info(`[ADMIN/AFFILIATES] Stripe Promotion Code created: ${stripePromo.id}`);
+      let stripePromo;
+      try {
+        stripePromo = await stripe.promotionCodes.create({
+          coupon: baseCouponId, // Link to your pre-configured free trial coupon
+          code: affiliateCode,
+          max_redemptions: 1000, // Or unlimited, depends on business logic
+          active: true,
+        });
+        server.log.info(`[ADMIN/AFFILIATES] Stripe Promotion Code created: ${stripePromo.id}`);
+      } catch (stripeError: any) {
+        server.log.error({ err: stripeError }, `[ADMIN/AFFILIATES] Failed to create Stripe Promotion Code. Coupon ID: ${baseCouponId}`);
+        // Fallback or rethrow? If we can't create the promo code, we probably shouldn't create the affiliate.
+        // For now, let's rethrow to be handled by the main catch block
+        throw stripeError;
+      }
 
       // Create affiliate in DB
       const affiliate = await prisma.affiliate.create({
