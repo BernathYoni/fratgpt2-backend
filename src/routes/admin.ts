@@ -45,6 +45,8 @@ export async function adminRoutes(server: FastifyInstance) {
         }
       });
 
+      console.log(`[ADMIN/FINANCIALS] Found ${messages.length} messages in range ${startDate} - ${endDate}`);
+
       // Initialize aggregators
       const breakdown: Record<string, { 
         totalCost: number, 
@@ -360,6 +362,15 @@ const resetStatsSchema = z.object({
         today.setHours(0, 0, 0, 0);
         
         console.log('[ADMIN/RESET] Resetting stats for TODAY only...');
+        
+        // Delete ChatSessions for today (cascades to messages)
+        const deletedSessions = await prisma.chatSession.deleteMany({
+          where: {
+            createdAt: { gte: today }
+          }
+        });
+        console.log(`[ADMIN/RESET] Deleted ${deletedSessions.count} ChatSessions for today`);
+
         deletedAdminStats = await prisma.adminStats.deleteMany({
           where: {
             date: { gte: today }
@@ -372,6 +383,11 @@ const resetStatsSchema = z.object({
         });
       } else {
         console.log('[ADMIN/RESET] Resetting ALL stats data...');
+        
+        // Delete ALL ChatSessions (cascades to messages)
+        const deletedSessions = await prisma.chatSession.deleteMany({});
+        console.log(`[ADMIN/RESET] Deleted ${deletedSessions.count} ChatSessions (ALL)`);
+
         deletedAdminStats = await prisma.adminStats.deleteMany({});
         deletedUsage = await prisma.usage.deleteMany({});
       }
