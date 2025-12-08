@@ -338,22 +338,45 @@ export async function adminRoutes(server: FastifyInstance) {
     }
   });
 
+const resetStatsSchema = z.object({
+  scope: z.enum(['all', 'today']).default('all'),
+});
+
   /**
    * POST /admin/reset-stats
    */
   server.post('/reset-stats', { preHandler: requireAdmin }, async (request, reply) => {
     const userEmail = (request as any).user?.email || 'unknown';
     try {
-      console.log(`[ADMIN/RESET] Request received from ${userEmail}`);
-      console.log('[ADMIN/RESET] Resetting all stats data...');
+      const { scope } = resetStatsSchema.parse(request.body || {});
+      
+      console.log(`[ADMIN/RESET] Request received from ${userEmail} with scope: ${scope}`);
 
-      const deletedAdminStats = await prisma.adminStats.deleteMany({});
-      console.log(`[ADMIN/RESET] Deleted ${deletedAdminStats.count} AdminStats records`);
+      let deletedAdminStats;
+      let deletedUsage;
 
-      const deletedUsage = await prisma.usage.deleteMany({});
-      console.log(`[ADMIN/RESET] Deleted ${deletedUsage.count} Usage records`);
+      if (scope === 'today') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        console.log('[ADMIN/RESET] Resetting stats for TODAY only...');
+        deletedAdminStats = await prisma.adminStats.deleteMany({
+          where: {
+            date: { gte: today }
+          }
+        });
+        deletedUsage = await prisma.usage.deleteMany({
+          where: {
+            date: { gte: today }
+          }
+        });
+      } else {
+        console.log('[ADMIN/RESET] Resetting ALL stats data...');
+        deletedAdminStats = await prisma.adminStats.deleteMany({});
+        deletedUsage = await prisma.usage.deleteMany({});
+      }
 
-      console.log(`[ADMIN/RESET] Success. Stats wiped by ${userEmail}`);
+      console.log(`[ADMIN/RESET] Success. Stats wiped by ${userEmail}. Scope: ${scope}`);
 
       return reply.send({
         success: true,
