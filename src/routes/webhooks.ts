@@ -144,6 +144,12 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription, serve
 
   const user = await prisma.user.findUnique({
     where: { stripeCustomerId: customerId },
+    include: { 
+      subscriptions: {
+        where: { status: 'ACTIVE' },
+        take: 1
+      }
+    }
   });
 
   if (!user) {
@@ -156,6 +162,24 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription, serve
   const priceId = subscription.items.data[0]?.price.id;
   let plan: string = PRICE_TO_PLAN[priceId] || 'FREE';
   const status = mapStripeStatus(subscription.status);
+
+  // Affiliate Tracking Logic
+  // Check if this is a new upgrade (FREE -> BASIC/PRO)
+  // We rely on the user's current subscription in DB (before update) being FREE or null
+  const currentDbPlan = user.subscriptions[0]?.plan || 'FREE';
+  
+  if (user.affiliateId && (plan === 'BASIC' || plan === 'PRO') && currentDbPlan === 'FREE') {
+    server.log.info(`[WEBHOOK-SUB-CHANGE] 🚀 Detected new upgrade for affiliate user! (Affiliate: ${user.affiliateId})`);
+    try {
+      await prisma.affiliate.update({
+        where: { id: user.affiliateId },
+        data: { signups: { increment: 1 } }
+      });
+      server.log.info(`[WEBHOOK-SUB-CHANGE] ✓ Incremented affiliate signups count`);
+    } catch (err) {
+      server.log.error({ err }, `[WEBHOOK-SUB-CHANGE] ❌ Failed to increment affiliate stats`);
+    }
+  }
 
   server.log.info(`[WEBHOOK-SUB-CHANGE] Price ID from Stripe: ${priceId}`);
   server.log.info(`[WEBHOOK-SUB-CHANGE] Mapped plan (initial): ${plan}`);
