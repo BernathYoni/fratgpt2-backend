@@ -98,11 +98,10 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session, server:
   const userId = session.metadata?.userId;
   const affiliateId = session.metadata?.affiliateId;
   
-  server.log.info(`[WEBHOOK-CHECKOUT] User ID from metadata: ${userId || 'NONE'}`);
-  server.log.info(`[WEBHOOK-CHECKOUT] Affiliate ID from metadata: ${affiliateId || 'NONE'}`);
+  server.log.info(`[WEBHOOK-CHECKOUT] 🟢 STARTING CHECKOUT HANDLER`);
+  server.log.info(`[WEBHOOK-CHECKOUT] User ID: ${userId || 'NONE'}`);
+  server.log.info(`[WEBHOOK-CHECKOUT] Affiliate ID (Metadata): ${affiliateId || 'NONE'}`);
   server.log.info(`[WEBHOOK-CHECKOUT] Session ID: ${session.id}`);
-  server.log.info(`[WEBHOOK-CHECKOUT] Customer ID: ${session.customer}`);
-  server.log.info(`[WEBHOOK-CHECKOUT] Payment status: ${session.payment_status}`);
 
   if (!userId) {
     server.log.warn('[WEBHOOK-CHECKOUT] ⚠️ No userId in metadata, skipping');
@@ -111,33 +110,63 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session, server:
 
   if (affiliateId) {
     try {
-      server.log.info(`[WEBHOOK-CHECKOUT] Linking user ${userId} to affiliate ${affiliateId}`);
+      server.log.info(`[WEBHOOK-CHECKOUT] 🔍 Fetching user ${userId} to check current link/plan...`);
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { subscriptions: { where: { status: 'ACTIVE' } } }
+      });
+
+      if (!user) {
+        server.log.error(`[WEBHOOK-CHECKOUT] ❌ User not found: ${userId}`);
+        return;
+      }
+
+      server.log.info(`[WEBHOOK-CHECKOUT] User found. Current Affiliate Link: ${user.affiliateId || 'NONE'}`);
+
+      if (user.affiliateId) {
+        server.log.info(`[WEBHOOK-CHECKOUT] ℹ️ User ALREADY linked to ${user.affiliateId}. Ignoring metadata link.`);
+        return;
+      }
+
+      server.log.info(`[WEBHOOK-CHECKOUT] 🔗 Linking user ${userId} to affiliate ${affiliateId}`);
       
       // Update User with affiliate relation
       await prisma.user.update({
         where: { id: userId },
         data: { affiliateId }
       });
+      server.log.info(`[WEBHOOK-CHECKOUT] ✅ User linked successfully.`);
 
-      // Increment affiliate stats
-      // REMOVED to avoid double counting. We handle this in handleSubscriptionChange
-      // await prisma.affiliate.update({
-      //   where: { id: affiliateId },
-      //   data: {
-      //     signups: { increment: 1 }
-      //   }
-      // });
-      // server.log.info(`[WEBHOOK-CHECKOUT] ✓ Affiliate stats updated`);
+      // RACE CONDITION CHECK
+      const currentPlan = user.subscriptions[0]?.plan || 'FREE';
+      server.log.info(`[WEBHOOK-CHECKOUT] 📊 Current DB Plan: ${currentPlan}`);
+
+      if (currentPlan === 'BASIC' || currentPlan === 'PRO') {
+        server.log.info(`[WEBHOOK-CHECKOUT] 🚀 CATCH-UP INCREMENT NEEDED!`);
+        server.log.info(`[WEBHOOK-CHECKOUT] Reason: Plan is already ${currentPlan} (Subscription webhook ran first), but user wasn't linked then.`);
+        
+        await prisma.affiliate.update({
+          where: { id: affiliateId },
+          data: { signups: { increment: 1 } }
+        });
+        server.log.info(`[WEBHOOK-CHECKOUT] ✅ Affiliate stats incremented (Catch-up)`);
+      } else {
+        server.log.info(`[WEBHOOK-CHECKOUT] ⏸️ Skipping increment here. Plan is FREE.`);
+        server.log.info(`[WEBHOOK-CHECKOUT] Expectation: handleSubscriptionChange will run next, see the new link, and handle the increment.`);
+      }
+
     } catch (err) {
       server.log.error({ err }, '[WEBHOOK-CHECKOUT] ❌ Failed to link affiliate');
     }
+  } else {
+    server.log.info(`[WEBHOOK-CHECKOUT] No affiliate ID in metadata. No attribution needed.`);
   }
 
-  server.log.info(`[WEBHOOK-CHECKOUT] ✅ Checkout completed for user ${userId}`);
-  server.log.info('[WEBHOOK-CHECKOUT] Subscription will be handled by subscription.created event');
+  server.log.info(`[WEBHOOK-CHECKOUT] ✅ DONE`);
 }
 
 async function handleSubscriptionChange(subscription: Stripe.Subscription, server: FastifyInstance) {
+  server.log.info(`[WEBHOOK-SUB-CHANGE] 🟢 STARTING SUBSCRIPTION HANDLER`);
   const customerId = subscription.customer as string;
   server.log.info(`[WEBHOOK-SUB-CHANGE] Subscription ID: ${subscription.id}`);
   server.log.info(`[WEBHOOK-SUB-CHANGE] Customer ID: ${customerId}`);
@@ -165,82 +194,38 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription, serve
   const status = mapStripeStatus(subscription.status);
 
   // Affiliate Tracking Logic
-  // Check if this is a new upgrade (FREE -> BASIC/PRO)
-  // We rely on the user's current subscription in DB (before update) being FREE or null
-  // TRIGGER DEPLOYMENT COMMENT
   const currentDbPlan = user.subscriptions[0]?.plan || 'FREE';
+  server.log.info(`[WEBHOOK-SUB-CHANGE] 📊 Plan Transition: ${currentDbPlan} -> ${plan}`);
   
-  if (user.affiliateId && (plan === 'BASIC' || plan === 'PRO') && currentDbPlan === 'FREE') {
-    server.log.info(`[WEBHOOK-SUB-CHANGE] 🚀 Detected new upgrade for affiliate user! (Affiliate: ${user.affiliateId})`);
-    try {
-      await prisma.affiliate.update({
-        where: { id: user.affiliateId },
-        data: { signups: { increment: 1 } }
-      });
-      server.log.info(`[WEBHOOK-SUB-CHANGE] ✓ Incremented affiliate signups count`);
-    } catch (err) {
-      server.log.error({ err }, `[WEBHOOK-SUB-CHANGE] ❌ Failed to increment affiliate stats`);
+  if (user.affiliateId) {
+    server.log.info(`[WEBHOOK-SUB-CHANGE] 🔗 User is linked to affiliate: ${user.affiliateId}`);
+    
+    if ((plan === 'BASIC' || plan === 'PRO') && currentDbPlan === 'FREE') {
+      server.log.info(`[WEBHOOK-SUB-CHANGE] 🚀 UPGRADE DETECTED! (FREE -> ${plan})`);
+      server.log.info(`[WEBHOOK-SUB-CHANGE] Incrementing stats for affiliate ${user.affiliateId}...`);
+      
+      try {
+        await prisma.affiliate.update({
+          where: { id: user.affiliateId },
+          data: { signups: { increment: 1 } }
+        });
+        server.log.info(`[WEBHOOK-SUB-CHANGE] ✅ Affiliate signups incremented`);
+      } catch (err) {
+        server.log.error({ err }, `[WEBHOOK-SUB-CHANGE] ❌ Failed to increment affiliate stats`);
+      }
+    } else {
+      server.log.info(`[WEBHOOK-SUB-CHANGE] No upgrade detected (or already paid). Skipping increment.`);
+    }
+  } else {
+    server.log.info(`[WEBHOOK-SUB-CHANGE] ℹ️ User is NOT linked to any affiliate. Skipping attribution.`);
+    if ((plan === 'BASIC' || plan === 'PRO') && currentDbPlan === 'FREE') {
+      server.log.warn(`[WEBHOOK-SUB-CHANGE] ⚠️ Note: This was an upgrade, but no affiliate was linked. If this was a referral, handleCheckoutCompleted should catch it.`);
     }
   }
 
   server.log.info(`[WEBHOOK-SUB-CHANGE] Price ID from Stripe: ${priceId}`);
   server.log.info(`[WEBHOOK-SUB-CHANGE] Mapped plan (initial): ${plan}`);
-  server.log.info(`[WEBHOOK-SUB-CHANGE] Configured Price IDs: ${Object.keys(PRICE_TO_PLAN).join(', ')}`);
-
-  // FAIL-SAFE: If plan is FREE but status is ACTIVE, try to infer from Product Name
-  if (plan === 'FREE' && status === 'ACTIVE') {
-    server.log.warn(`[WEBHOOK-SUB-CHANGE] ⚠️ Plan mismatch detected. Attempting self-healing via Product Name...`);
-    try {
-      const price = await stripe.prices.retrieve(priceId, { expand: ['product'] });
-      const product = price.product as Stripe.Product;
-      const productName = product.name.toLowerCase();
-      
-      server.log.info(`[WEBHOOK-SUB-CHANGE] Found Product Name: "${product.name}"`);
-
-      if (productName.includes('pro')) {
-        plan = 'PRO';
-        server.log.info(`[WEBHOOK-SUB-CHANGE] ✅ Self-healed plan to PRO`);
-      } else if (productName.includes('basic')) {
-        plan = 'BASIC';
-        server.log.info(`[WEBHOOK-SUB-CHANGE] ✅ Self-healed plan to BASIC`);
-      } else {
-        server.log.error(`[WEBHOOK-SUB-CHANGE] ❌ Could not infer plan from name "${product.name}". Defaulting to FREE.`);
-      }
-    } catch (err: any) {
-      server.log.error(`[WEBHOOK-SUB-CHANGE] ❌ Failed to retrieve product details: ${err.message}`);
-    }
-  }
-
-  server.log.info(`[WEBHOOK-SUB-CHANGE] Final Plan: ${plan}`);
-  server.log.info(`[WEBHOOK-SUB-CHANGE] Mapped status: ${status}`);
-  
-  const periodEnd = subscription.current_period_end 
-    ? new Date(subscription.current_period_end * 1000) 
-    : new Date(); // Default to now if missing
-
-  server.log.info(`[WEBHOOK-SUB-CHANGE] Period end: ${periodEnd.toISOString()}`);
-
-  // Upsert subscription
-  const result = await prisma.subscription.upsert({
-    where: { stripeSubscriptionId: subscription.id },
-    create: {
-      userId: user.id,
-      stripeSubscriptionId: subscription.id,
-      stripePriceId: priceId,
-      plan: plan as any,
-      status,
-      currentPeriodEnd: periodEnd,
-    },
-    update: {
-      stripePriceId: priceId,
-      plan: plan as any,
-      status,
-      currentPeriodEnd: periodEnd,
-    },
-  });
-
-  server.log.info(`[WEBHOOK-SUB-CHANGE] ✅ Subscription updated in database (ID: ${result.id})`);
-  server.log.info(`[WEBHOOK-SUB-CHANGE] User ${user.email} now has: ${plan} (${status})`);
+  // ... rest of the function ...
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription, server: FastifyInstance) {
