@@ -127,10 +127,11 @@ export async function billingRoutes(server: FastifyInstance) {
       server.log.info(`[BILLING-CHECKOUT] ✅ Checkout session ready for ${user.email}`);
 
       return reply.send({ url: session.url });
-    } catch (error) {
+    } catch (error: any) {
       server.log.error('[BILLING-CHECKOUT] ❌ Error creating checkout session:');
       server.log.error(error);
-      return reply.code(500).send({ error: 'Failed to create checkout session' });
+      const errorMessage = error?.message || 'Failed to create checkout session';
+      return reply.code(500).send({ error: errorMessage });
     }
   });
 

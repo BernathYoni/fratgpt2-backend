@@ -120,13 +120,14 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session, server:
       });
 
       // Increment affiliate stats
-      await prisma.affiliate.update({
-        where: { id: affiliateId },
-        data: {
-          signups: { increment: 1 }
-        }
-      });
-      server.log.info(`[WEBHOOK-CHECKOUT] ✓ Affiliate stats updated`);
+      // REMOVED to avoid double counting. We handle this in handleSubscriptionChange
+      // await prisma.affiliate.update({
+      //   where: { id: affiliateId },
+      //   data: {
+      //     signups: { increment: 1 }
+      //   }
+      // });
+      // server.log.info(`[WEBHOOK-CHECKOUT] ✓ Affiliate stats updated`);
     } catch (err) {
       server.log.error({ err }, '[WEBHOOK-CHECKOUT] ❌ Failed to link affiliate');
     }
