@@ -105,10 +105,13 @@ export async function affiliateRoutes(server: FastifyInstance) {
         // Calculate conversions from Stripe data, or use our signups/conversions
         // For simplicity, we'll use 'signups' from our DB as the base for payout
         const unpaidBalance = (aff.signups * aff.payoutRate) - aff.amountPaid;
+        const unpaidSignups = aff.payoutRate > 0 ? Math.max(0, Math.floor(unpaidBalance / aff.payoutRate)) : 0;
+        
         return {
           ...aff,
           referredUsersCount: aff._count.referredUsers,
           unpaidBalance,
+          unpaidSignups,
         };
       });
 
