@@ -56,6 +56,7 @@ async function start() {
     await server.register(usageRoutes, { prefix: '/usage' });
     await server.register(webhookRoutes, { prefix: '/webhooks' });
     await server.register(adminRoutes, { prefix: '/admin' });
+    await server.register(affiliateRoutes, { prefix: '/admin/affiliates' });
 
     const port = parseInt(process.env.PORT || '3000', 10);
     const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
