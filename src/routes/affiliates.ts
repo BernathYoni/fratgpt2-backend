@@ -8,6 +8,7 @@ import { stripe } from '../routes/billing'; // Import stripe instance
 const createAffiliateSchema = z.object({
   name: z.string().min(1),
   code: z.string().min(3).optional(), // Affiliate code, e.g., MIKEFREE
+  payoutRate: z.number().min(0).optional(),
 });
 
 const updateAffiliateSchema = z.object({
@@ -21,7 +22,7 @@ export async function affiliateRoutes(server: FastifyInstance) {
   server.post('/', { preHandler: requireAdmin }, async (request, reply) => {
     try {
       server.log.info('[ADMIN/AFFILIATES] Creating new affiliate');
-      const { name, code } = createAffiliateSchema.parse(request.body);
+      const { name, code, payoutRate } = createAffiliateSchema.parse(request.body);
 
       // Generate a unique code if not provided
       let affiliateCode = code;
@@ -69,6 +70,7 @@ export async function affiliateRoutes(server: FastifyInstance) {
         data: {
           name,
           code: affiliateCode,
+          payoutRate: payoutRate ?? 5.00,
           referralLink: `${process.env.FRONTEND_URL}/?ref=${affiliateCode}`,
           stripePromoId: stripePromo.id,
           stripeCouponId: baseCouponId,
