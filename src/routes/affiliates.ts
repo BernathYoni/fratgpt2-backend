@@ -58,6 +58,7 @@ export async function affiliateRoutes(server: FastifyInstance) {
         server.log.info(`[ADMIN/AFFILIATES] Stripe Promotion Code created: ${stripePromo.id}`);
       } catch (stripeError: any) {
         server.log.error({ err: stripeError }, `[ADMIN/AFFILIATES] Failed to create Stripe Promotion Code. Coupon ID: ${baseCouponId}`);
+        server.log.error(`[ADMIN/AFFILIATES] Stripe Error Message: ${stripeError.message}`);
         // Fallback or rethrow? If we can't create the promo code, we probably shouldn't create the affiliate.
         // For now, let's rethrow to be handled by the main catch block
         throw stripeError;
