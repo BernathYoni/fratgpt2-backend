@@ -68,10 +68,10 @@ export class LLMOrchestrator {
    */
   private async generateFast(messages: LLMMessage[]) {
     const startTime = Date.now();
-    console.log(`[FAST] [${new Date().toISOString()}] Calling Gemini with maxTokens=4096, temp=0.5`);
+    console.log(`[FAST] [${new Date().toISOString()}] Calling Gemini with maxTokens=2048, temp=0.5`);
     try {
       const response = await this.gemini.generate(messages, {
-        maxTokens: 4096, // Increased from 1024 to allow for longer responses
+        maxTokens: 2048, // Reduced to optimize costs
         temperature: 0.5,
         mode: 'FAST', // Ensure Flash model is used
       });
@@ -95,7 +95,7 @@ export class LLMOrchestrator {
 
     // Call all providers in parallel with Regular-mode models
     const regularOptions = {
-      maxTokens: 8192,
+      maxTokens: 4096,
       temperature: 0.7,
       requestId,
       mode: 'REGULAR' as const, // Gemini 2.5 Pro, GPT-4 Turbo, Claude Sonnet 4.5
@@ -190,7 +190,7 @@ export class LLMOrchestrator {
 
     // Call all providers in parallel with increased token limits to handle thinking tokens
     const expertOptions = {
-      maxTokens: 8192,
+      maxTokens: 4096,
       temperature: 0.7,
       requestId, // Pass request ID to providers
       mode: 'EXPERT' as const, // Use Pro models for expert mode
