@@ -9,12 +9,14 @@ const createAffiliateSchema = z.object({
   name: z.string().min(1),
   code: z.string().min(3).optional(), // Affiliate code, e.g., MIKEFREE
   payoutRate: z.number().min(0).optional(),
+  paymentManager: z.string().optional(),
 });
 
 const updateAffiliateSchema = z.object({
   name: z.string().min(1).optional(),
   payoutRate: z.number().min(0).optional(),
   amountPaid: z.number().min(0).optional(),
+  paymentManager: z.string().optional(),
 });
 
 export async function affiliateRoutes(server: FastifyInstance) {
@@ -22,7 +24,7 @@ export async function affiliateRoutes(server: FastifyInstance) {
   server.post('/', { preHandler: requireAdmin }, async (request, reply) => {
     try {
       server.log.info('[ADMIN/AFFILIATES] Creating new affiliate');
-      const { name, code, payoutRate } = createAffiliateSchema.parse(request.body);
+      const { name, code, payoutRate, paymentManager } = createAffiliateSchema.parse(request.body);
 
       // Generate a unique code if not provided
       let affiliateCode = code;
@@ -71,6 +73,7 @@ export async function affiliateRoutes(server: FastifyInstance) {
           name,
           code: affiliateCode,
           payoutRate: payoutRate ?? 5.00,
+          paymentManager,
           referralLink: `${process.env.FRONTEND_URL}/?ref=${affiliateCode}`,
           stripePromoId: stripePromo.id,
           stripeCouponId: baseCouponId,
@@ -145,6 +148,110 @@ export async function affiliateRoutes(server: FastifyInstance) {
       return reply.send(updatedAffiliate);
     } catch (error) {
       server.log.error({ err: error }, `[ADMIN/AFFILIATES] Error marking affiliate ${id} paid`);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // PUT /admin/affiliates/:id - Update affiliate
+  server.put('/:id', { preHandler: requireAdmin }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    try {
+      server.log.info(`[ADMIN/AFFILIATES] Updating affiliate ${id}`);
+      const { name, payoutRate, paymentManager } = updateAffiliateSchema.parse(request.body);
+
+      const affiliate = await prisma.affiliate.findUnique({ where: { id } });
+      if (!affiliate) {
+        return reply.code(404).send({ error: 'Affiliate not found' });
+      }
+
+      const updatedAffiliate = await prisma.affiliate.update({
+        where: { id },
+        data: {
+          name: name ?? undefined,
+          payoutRate: payoutRate ?? undefined,
+          paymentManager: paymentManager ?? undefined,
+        },
+      });
+
+      server.log.info(`[ADMIN/AFFILIATES] Affiliate ${id} updated.`);
+      return reply.send(updatedAffiliate);
+    } catch (error) {
+      server.log.error({ err: error }, `[ADMIN/AFFILIATES] Error updating affiliate ${id}`);
+      if (error instanceof z.ZodError) {
+        return reply.code(400).send({ error: 'Invalid input', details: error.errors });
+      }
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // POST /admin/affiliates/:id/archive - Toggle archive status
+  server.post('/:id/archive', { preHandler: requireAdmin }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    try {
+      server.log.info(`[ADMIN/AFFILIATES] Toggling archive status for affiliate ${id}`);
+
+      const affiliate = await prisma.affiliate.findUnique({ where: { id } });
+      if (!affiliate) {
+        return reply.code(404).send({ error: 'Affiliate not found' });
+      }
+
+      const updatedAffiliate = await prisma.affiliate.update({
+        where: { id },
+        data: { archived: !affiliate.archived },
+      });
+
+      // Optionally: Deactivate/Activate Stripe Promo Code
+      if (updatedAffiliate.stripePromoId) {
+        try {
+          await stripe.promotionCodes.update(updatedAffiliate.stripePromoId, {
+            active: !updatedAffiliate.archived
+          });
+          server.log.info(`[ADMIN/AFFILIATES] Stripe promo code ${updatedAffiliate.stripePromoId} active status set to ${!updatedAffiliate.archived}`);
+        } catch (stripeError: any) {
+          server.log.warn(`[ADMIN/AFFILIATES] Failed to update Stripe promo code status: ${stripeError.message}`);
+        }
+      }
+
+      server.log.info(`[ADMIN/AFFILIATES] Affiliate ${id} archived status: ${updatedAffiliate.archived}`);
+      return reply.send(updatedAffiliate);
+    } catch (error) {
+      server.log.error({ err: error }, `[ADMIN/AFFILIATES] Error archiving affiliate ${id}`);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // DELETE /admin/affiliates/:id - Delete affiliate
+  server.delete('/:id', { preHandler: requireAdmin }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    try {
+      server.log.info(`[ADMIN/AFFILIATES] Deleting affiliate ${id}`);
+
+      const affiliate = await prisma.affiliate.findUnique({ where: { id } });
+      if (!affiliate) {
+        return reply.code(404).send({ error: 'Affiliate not found' });
+      }
+
+      // Set referred users' affiliateId to null first (avoid FK constraint error)
+      await prisma.user.updateMany({
+        where: { affiliateId: id },
+        data: { affiliateId: null }
+      });
+
+      // Try to deactivate promo code
+      if (affiliate.stripePromoId) {
+        try {
+          await stripe.promotionCodes.update(affiliate.stripePromoId, { active: false });
+        } catch (e) {
+            server.log.warn(`[ADMIN/AFFILIATES] Could not deactivate promo code on Stripe: ${e}`);
+        }
+      }
+
+      await prisma.affiliate.delete({ where: { id } });
+
+      server.log.info(`[ADMIN/AFFILIATES] Affiliate ${id} deleted.`);
+      return reply.code(204).send();
+    } catch (error) {
+      server.log.error({ err: error }, `[ADMIN/AFFILIATES] Error deleting affiliate ${id}`);
       return reply.code(500).send({ error: 'Internal server error' });
     }
   });

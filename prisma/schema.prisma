@@ -41,6 +41,7 @@ model Affiliate {
   // Money
   payoutRate     Float    @default(5.00)
   amountPaid     Float    @default(0)
+  paymentManager String?  // "Yoni" or "Ethan"
   
   stripePromoId  String?  // ID of the promotion code in Stripe
   stripeCouponId String?  // ID of the underlying coupon in Stripe
