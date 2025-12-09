@@ -12,6 +12,7 @@ const createAffiliateSchema = z.object({
   paymentManager: z.string().optional(),
   phoneNumber: z.string().optional(),
   venmoHandle: z.string().optional(),
+  collegeId: z.string().optional(),
 });
 
 const updateAffiliateSchema = z.object({
@@ -21,6 +22,7 @@ const updateAffiliateSchema = z.object({
   paymentManager: z.string().optional(),
   phoneNumber: z.string().optional(),
   venmoHandle: z.string().optional(),
+  collegeId: z.string().optional(),
 });
 
 export async function affiliateRoutes(server: FastifyInstance) {
@@ -28,7 +30,7 @@ export async function affiliateRoutes(server: FastifyInstance) {
   server.post('/', { preHandler: requireAdmin }, async (request, reply) => {
     try {
       server.log.info('[ADMIN/AFFILIATES] Creating new affiliate');
-      const { name, code, payoutRate, paymentManager, phoneNumber, venmoHandle } = createAffiliateSchema.parse(request.body);
+      const { name, code, payoutRate, paymentManager, phoneNumber, venmoHandle, collegeId } = createAffiliateSchema.parse(request.body);
 
       // Generate a unique code if not provided
       let affiliateCode = code;
@@ -80,6 +82,7 @@ export async function affiliateRoutes(server: FastifyInstance) {
           paymentManager,
           phoneNumber,
           venmoHandle,
+          collegeId,
           referralLink: `${process.env.FRONTEND_URL}/?ref=${affiliateCode}`,
           stripePromoId: stripePromo.id,
           stripeCouponId: baseCouponId,
@@ -103,6 +106,7 @@ export async function affiliateRoutes(server: FastifyInstance) {
       server.log.info('[ADMIN/AFFILIATES] Fetching all affiliates');
       const affiliates = await prisma.affiliate.findMany({
         include: {
+          college: true, // Include college information
           _count: {
             select: { referredUsers: true }, // Count users linked to this affiliate
           },
@@ -163,7 +167,7 @@ export async function affiliateRoutes(server: FastifyInstance) {
     const { id } = request.params as { id: string };
     try {
       server.log.info(`[ADMIN/AFFILIATES] Updating affiliate ${id}`);
-      const { name, payoutRate, paymentManager, phoneNumber, venmoHandle } = updateAffiliateSchema.parse(request.body);
+      const { name, payoutRate, paymentManager, phoneNumber, venmoHandle, collegeId } = updateAffiliateSchema.parse(request.body);
 
       const affiliate = await prisma.affiliate.findUnique({ where: { id } });
       if (!affiliate) {
@@ -178,6 +182,7 @@ export async function affiliateRoutes(server: FastifyInstance) {
           paymentManager: paymentManager ?? undefined,
           phoneNumber: phoneNumber ?? undefined,
           venmoHandle: venmoHandle ?? undefined,
+          collegeId: collegeId ?? undefined,
         },
       });
 

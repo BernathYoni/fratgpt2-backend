@@ -32,29 +32,47 @@ model Affiliate {
   name           String   // Internal name (e.g. "Mike")
   code           String   @unique // Stripe Promo Code (e.g. "REF-7X92K")
   referralLink   String   // Full link
-  
+
   // Stats
   visits         Int      @default(0)
   signups        Int      @default(0)
   conversions    Int      @default(0) // Paid users
-  
+
   // Money
   payoutRate     Float    @default(5.00)
   amountPaid     Float    @default(0)
   paymentManager String?  // "Yoni" or "Ethan"
-  
+
   phoneNumber    String?
   venmoHandle    String?
 
+  // College association
+  collegeId      String?
+  college        College? @relation(fields: [collegeId], references: [id])
+
   stripePromoId  String?  // ID of the promotion code in Stripe
   stripeCouponId String?  // ID of the underlying coupon in Stripe
-  
+
   archived       Boolean  @default(false)
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-  
+
   referredUsers  User[]
+}
+
+model College {
+  id         String      @id @default(uuid())
+  name       String      @unique // Full college name (e.g., "Harvard University")
+  state      String      // State abbreviation (e.g., "MA")
+  city       String?     // City name (optional)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  affiliates Affiliate[]
+
+  @@index([name])
+  @@index([state])
 }
 
 enum UserRole {

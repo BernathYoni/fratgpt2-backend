@@ -1,5 +1,6 @@
 import { prisma } from './db/client';
 import { hashPassword } from './utils/auth';
+import { COMMON_US_COLLEGES } from './services/collegeSeeds';
 
 /**
  * Seed script for development
@@ -76,6 +77,24 @@ async function main() {
 
     console.log(`✅ Created usage data for free@test.com (5/20 solves used)`);
   }
+
+  // Seed colleges
+  console.log('');
+  console.log('🏫 Seeding colleges...');
+  let collegeCount = 0;
+  for (const collegeData of COMMON_US_COLLEGES) {
+    await prisma.college.upsert({
+      where: { name: collegeData.name },
+      update: {},
+      create: {
+        name: collegeData.name,
+        state: collegeData.state,
+        city: collegeData.city,
+      },
+    });
+    collegeCount++;
+  }
+  console.log(`✅ Created ${collegeCount} colleges`);
 
   console.log('');
   console.log('🎉 Seed complete!');
