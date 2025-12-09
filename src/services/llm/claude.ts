@@ -34,7 +34,16 @@ export class ClaudeProvider implements LLMProvider {
   async generate(messages: LLMMessage[], options?: LLMOptions): Promise<LLMResponse> {
     const startTime = Date.now();
     const requestId = options?.requestId || 'SINGLE';
-    const model = 'claude-sonnet-4-5-20250929';
+
+    // Select model based on mode:
+    // REGULAR: Claude Sonnet 4.5
+    // EXPERT: Claude Opus 4.5
+    let model: string;
+    if (options?.mode === 'EXPERT') {
+      model = 'claude-opus-4-5-20251101';
+    } else {
+      model = 'claude-sonnet-4-5-20250929';
+    }
 
     console.log(`[CLAUDE] [${new Date().toISOString()}] [${requestId}] 🚀 Starting generation`);
     console.log(`[CLAUDE] [${requestId}] 📊 Model:`, model);

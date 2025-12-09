@@ -279,11 +279,20 @@ export async function chatRoutes(server: FastifyInstance) {
                   output: tokens.outputTokens,
                 };
               } else if (provider.provider === 'claude') {
-                tokenUsage.claude = {
-                  input: tokens.inputTokens,
-                  output: tokens.outputTokens,
-                  thinking: tokens.thinkingTokens || 0,
-                };
+                // REGULAR mode uses Sonnet, EXPERT mode uses Opus
+                if (mode === 'EXPERT') {
+                  tokenUsage.claudeOpus = {
+                    input: tokens.inputTokens,
+                    output: tokens.outputTokens,
+                    thinking: tokens.thinkingTokens || 0,
+                  };
+                } else {
+                  tokenUsage.claudeSonnet = {
+                    input: tokens.inputTokens,
+                    output: tokens.outputTokens,
+                    thinking: tokens.thinkingTokens || 0,
+                  };
+                }
               }
             }
           }

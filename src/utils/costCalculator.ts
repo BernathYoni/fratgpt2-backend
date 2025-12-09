@@ -13,7 +13,7 @@
  * EXPERT Mode:
  * - Gemini 3.0 (gemini-exp-1206): $10.00 input, $40.00 output (estimated)
  * - GPT-5.1 (gpt-5.1): $1.25 input, $10.00 output (GPT-5 pricing as proxy)
- * - Claude 4.5 Sonnet: $3.00 input, $15.00 output, $3.75 thinking
+ * - Claude 4.5 Opus: $5.00 input, $25.00 output, $6.25 thinking (estimated)
  */
 
 export interface TokenCosts {
@@ -34,7 +34,8 @@ export interface TotalCosts {
   geminiFlash: ModelCost;
   geminiPro: ModelCost;
   openai: ModelCost;
-  claude: ModelCost;
+  claudeSonnet: ModelCost;
+  claudeOpus: ModelCost;
   total: {
     cost: number;
     tokens: number | bigint;
@@ -64,10 +65,15 @@ export class CostCalculator {
       INPUT: 1.25,   // $1.25 per 1M input tokens (GPT-5.1)
       OUTPUT: 10.00, // $10.00 per 1M output tokens
     },
-    CLAUDE: {
+    CLAUDE_SONNET: {
       INPUT: 3.00,    // $3.00 per 1M input tokens (Claude 4.5 Sonnet)
       OUTPUT: 15.00,  // $15.00 per 1M output tokens
       THINKING: 3.75, // $3.75 per 1M thinking tokens (extended thinking)
+    },
+    CLAUDE_OPUS: {
+      INPUT: 5.00,    // $5.00 per 1M input tokens (Claude 4.5 Opus)
+      OUTPUT: 25.00,  // $25.00 per 1M output tokens
+      THINKING: 6.25, // $6.25 per 1M thinking tokens (estimated at 1.25x input rate)
     },
   };
 
@@ -98,10 +104,20 @@ export class CostCalculator {
    * Calculate cost for a specific model by string name
    */
   static calculateCost(
-    model: 'gpt-4o' | 'claude-3.5-sonnet',
+    model: 'gpt-4o' | 'claude-sonnet' | 'claude-opus',
     tokens: TokenCosts
   ): { totalCost: number } {
-    const modelKey = model === 'gpt-4o' ? 'OPENAI_PRO' : 'CLAUDE';
+    let modelKey: string;
+    if (model === 'gpt-4o') {
+      modelKey = 'OPENAI_PRO';
+    } else if (model === 'claude-sonnet') {
+      modelKey = 'CLAUDE_SONNET';
+    } else if (model === 'claude-opus') {
+      modelKey = 'CLAUDE_OPUS';
+    } else {
+      // Fallback for legacy 'claude-3.5-sonnet'
+      modelKey = 'CLAUDE_SONNET';
+    }
     const cost = this.calculateModelCost(modelKey as any, tokens);
     return { totalCost: cost };
   }
@@ -110,15 +126,17 @@ export class CostCalculator {
    * Calculate cost for a specific model
    */
   static calculateModelCost(
-    model: 'GEMINI_FLASH' | 'GEMINI_PRO' | 'GEMINI_EXPERT' | 'OPENAI_MINI' | 'OPENAI_PRO' | 'CLAUDE',
+    model: 'GEMINI_FLASH' | 'GEMINI_PRO' | 'GEMINI_EXPERT' | 'OPENAI_MINI' | 'OPENAI_PRO' | 'CLAUDE_SONNET' | 'CLAUDE_OPUS',
     tokens: TokenCosts
   ): number {
     // Fallback for old keys if necessary or just strict typing
-    const prices = this.PRICES[model as keyof typeof CostCalculator.PRICES]; 
-    
+    const prices = this.PRICES[model as keyof typeof CostCalculator.PRICES];
+
     if (!prices) {
         // Fallback for legacy 'OPENAI' key if passed dynamically
         if (model === 'OPENAI' as any) return this.calculateModelCost('OPENAI_PRO', tokens);
+        // Fallback for legacy 'CLAUDE' key
+        if (model === 'CLAUDE' as any) return this.calculateModelCost('CLAUDE_SONNET', tokens);
         return 0;
     }
 
@@ -129,7 +147,7 @@ export class CostCalculator {
     // Convert to millions and apply pricing
     const inputCost = (inputTokens / 1_000_000) * prices.INPUT;
     const outputCost = (outputTokens / 1_000_000) * prices.OUTPUT;
-    const thinkingCost = model === 'CLAUDE' && thinkingTokens > 0 && 'THINKING' in prices
+    const thinkingCost = (model === 'CLAUDE_SONNET' || model === 'CLAUDE_OPUS') && thinkingTokens > 0 && 'THINKING' in prices
       ? (thinkingTokens / 1_000_000) * prices.THINKING
       : 0;
 
@@ -146,9 +164,12 @@ export class CostCalculator {
     geminiProOutputTokens: number | bigint;
     openaiInputTokens: number | bigint;
     openaiOutputTokens: number | bigint;
-    claudeInputTokens: number | bigint;
-    claudeOutputTokens: number | bigint;
-    claudeThinkingTokens: number | bigint;
+    claudeSonnetInputTokens: number | bigint;
+    claudeSonnetOutputTokens: number | bigint;
+    claudeSonnetThinkingTokens: number | bigint;
+    claudeOpusInputTokens: number | bigint;
+    claudeOpusOutputTokens: number | bigint;
+    claudeOpusThinkingTokens: number | bigint;
   }): TotalCosts {
     // Calculate per-model costs
     const geminiFlashCost = this.calculateModelCost('GEMINI_FLASH', {
@@ -169,21 +190,28 @@ export class CostCalculator {
       outputTokens: data.openaiOutputTokens,
     });
 
-    const claudeCost = this.calculateModelCost('CLAUDE', {
-      inputTokens: data.claudeInputTokens,
-      outputTokens: data.claudeOutputTokens,
-      thinkingTokens: data.claudeThinkingTokens,
+    const claudeSonnetCost = this.calculateModelCost('CLAUDE_SONNET', {
+      inputTokens: data.claudeSonnetInputTokens,
+      outputTokens: data.claudeSonnetOutputTokens,
+      thinkingTokens: data.claudeSonnetThinkingTokens,
+    });
+
+    const claudeOpusCost = this.calculateModelCost('CLAUDE_OPUS', {
+      inputTokens: data.claudeOpusInputTokens,
+      outputTokens: data.claudeOpusOutputTokens,
+      thinkingTokens: data.claudeOpusThinkingTokens,
     });
 
     // Calculate total cost
-    const totalCost = geminiFlashCost + geminiProCost + openaiCost + claudeCost;
+    const totalCost = geminiFlashCost + geminiProCost + openaiCost + claudeSonnetCost + claudeOpusCost;
 
     // Calculate total tokens
     const totalTokens =
       Number(data.geminiFlashInputTokens) + Number(data.geminiFlashOutputTokens) +
       Number(data.geminiProInputTokens) + Number(data.geminiProOutputTokens) +
       Number(data.openaiInputTokens) + Number(data.openaiOutputTokens) +
-      Number(data.claudeInputTokens) + Number(data.claudeOutputTokens) + Number(data.claudeThinkingTokens);
+      Number(data.claudeSonnetInputTokens) + Number(data.claudeSonnetOutputTokens) + Number(data.claudeSonnetThinkingTokens) +
+      Number(data.claudeOpusInputTokens) + Number(data.claudeOpusOutputTokens) + Number(data.claudeOpusThinkingTokens);
 
     return {
       geminiFlash: {
@@ -204,12 +232,19 @@ export class CostCalculator {
         cost: openaiCost,
         percentageOfTotal: totalCost > 0 ? (openaiCost / totalCost) * 100 : 0,
       },
-      claude: {
-        inputTokens: data.claudeInputTokens,
-        outputTokens: data.claudeOutputTokens,
-        thinkingTokens: data.claudeThinkingTokens,
-        cost: claudeCost,
-        percentageOfTotal: totalCost > 0 ? (claudeCost / totalCost) * 100 : 0,
+      claudeSonnet: {
+        inputTokens: data.claudeSonnetInputTokens,
+        outputTokens: data.claudeSonnetOutputTokens,
+        thinkingTokens: data.claudeSonnetThinkingTokens,
+        cost: claudeSonnetCost,
+        percentageOfTotal: totalCost > 0 ? (claudeSonnetCost / totalCost) * 100 : 0,
+      },
+      claudeOpus: {
+        inputTokens: data.claudeOpusInputTokens,
+        outputTokens: data.claudeOpusOutputTokens,
+        thinkingTokens: data.claudeOpusThinkingTokens,
+        cost: claudeOpusCost,
+        percentageOfTotal: totalCost > 0 ? (claudeOpusCost / totalCost) * 100 : 0,
       },
       total: {
         cost: totalCost,
@@ -229,9 +264,12 @@ export class CostCalculator {
       geminiProOutputTokens: number | bigint;
       openaiInputTokens: number | bigint;
       openaiOutputTokens: number | bigint;
-      claudeInputTokens: number | bigint;
-      claudeOutputTokens: number | bigint;
-      claudeThinkingTokens: number | bigint;
+      claudeSonnetInputTokens: number | bigint;
+      claudeSonnetOutputTokens: number | bigint;
+      claudeSonnetThinkingTokens: number | bigint;
+      claudeOpusInputTokens: number | bigint;
+      claudeOpusOutputTokens: number | bigint;
+      claudeOpusThinkingTokens: number | bigint;
     }>
   ): TotalCosts {
     // Sum up all token counts
@@ -243,9 +281,12 @@ export class CostCalculator {
         geminiProOutputTokens: BigInt(acc.geminiProOutputTokens) + BigInt(record.geminiProOutputTokens),
         openaiInputTokens: BigInt(acc.openaiInputTokens) + BigInt(record.openaiInputTokens),
         openaiOutputTokens: BigInt(acc.openaiOutputTokens) + BigInt(record.openaiOutputTokens),
-        claudeInputTokens: BigInt(acc.claudeInputTokens) + BigInt(record.claudeInputTokens),
-        claudeOutputTokens: BigInt(acc.claudeOutputTokens) + BigInt(record.claudeOutputTokens),
-        claudeThinkingTokens: BigInt(acc.claudeThinkingTokens) + BigInt(record.claudeThinkingTokens),
+        claudeSonnetInputTokens: BigInt(acc.claudeSonnetInputTokens) + BigInt(record.claudeSonnetInputTokens),
+        claudeSonnetOutputTokens: BigInt(acc.claudeSonnetOutputTokens) + BigInt(record.claudeSonnetOutputTokens),
+        claudeSonnetThinkingTokens: BigInt(acc.claudeSonnetThinkingTokens) + BigInt(record.claudeSonnetThinkingTokens),
+        claudeOpusInputTokens: BigInt(acc.claudeOpusInputTokens) + BigInt(record.claudeOpusInputTokens),
+        claudeOpusOutputTokens: BigInt(acc.claudeOpusOutputTokens) + BigInt(record.claudeOpusOutputTokens),
+        claudeOpusThinkingTokens: BigInt(acc.claudeOpusThinkingTokens) + BigInt(record.claudeOpusThinkingTokens),
       }),
       {
         geminiFlashInputTokens: 0n,
@@ -254,9 +295,12 @@ export class CostCalculator {
         geminiProOutputTokens: 0n,
         openaiInputTokens: 0n,
         openaiOutputTokens: 0n,
-        claudeInputTokens: 0n,
-        claudeOutputTokens: 0n,
-        claudeThinkingTokens: 0n,
+        claudeSonnetInputTokens: 0n,
+        claudeSonnetOutputTokens: 0n,
+        claudeSonnetThinkingTokens: 0n,
+        claudeOpusInputTokens: 0n,
+        claudeOpusOutputTokens: 0n,
+        claudeOpusThinkingTokens: 0n,
       }
     );
 

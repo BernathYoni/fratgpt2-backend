@@ -123,6 +123,8 @@ export class UsageService {
       geminiPro?: { input: number; output: number };
       openai?: { input: number; output: number };
       claude?: { input: number; output: number; thinking?: number };
+      claudeSonnet?: { input: number; output: number; thinking?: number };
+      claudeOpus?: { input: number; output: number; thinking?: number };
     }
   ): Promise<void> {
     const today = this.getToday();
@@ -181,17 +183,52 @@ export class UsageService {
       };
     }
 
-    // Claude
-    if (tokenUsage.claude) {
-      const cost = CostCalculator.calculateCost('claude-3.5-sonnet', {
-        inputTokens: tokenUsage.claude.input,
-        outputTokens: tokenUsage.claude.output,
+    // Claude Sonnet (REGULAR mode)
+    if (tokenUsage.claudeSonnet) {
+      const cost = CostCalculator.calculateCost('claude-sonnet', {
+        inputTokens: tokenUsage.claudeSonnet.input,
+        outputTokens: tokenUsage.claudeSonnet.output,
+        thinkingTokens: tokenUsage.claudeSonnet.thinking || 0,
       });
       totalCost += cost.totalCost;
-      updates.claudeInputTokens = { increment: tokenUsage.claude.input };
-      updates.claudeOutputTokens = { increment: tokenUsage.claude.output };
-      updates.claudeThinkingTokens = { increment: tokenUsage.claude.thinking || 0 };
-      updates.claudeCost = { increment: cost.totalCost };
+      updates.claudeSonnetInputTokens = { increment: tokenUsage.claudeSonnet.input };
+      updates.claudeSonnetOutputTokens = { increment: tokenUsage.claudeSonnet.output };
+      updates.claudeSonnetThinkingTokens = { increment: tokenUsage.claudeSonnet.thinking || 0 };
+      updates.claudeSonnetCost = { increment: cost.totalCost };
+      updates.tokensUsed = {
+        increment: (updates.tokensUsed?.increment || 0) + tokenUsage.claudeSonnet.input + tokenUsage.claudeSonnet.output,
+      };
+    }
+
+    // Claude Opus (EXPERT mode)
+    if (tokenUsage.claudeOpus) {
+      const cost = CostCalculator.calculateCost('claude-opus', {
+        inputTokens: tokenUsage.claudeOpus.input,
+        outputTokens: tokenUsage.claudeOpus.output,
+        thinkingTokens: tokenUsage.claudeOpus.thinking || 0,
+      });
+      totalCost += cost.totalCost;
+      updates.claudeOpusInputTokens = { increment: tokenUsage.claudeOpus.input };
+      updates.claudeOpusOutputTokens = { increment: tokenUsage.claudeOpus.output };
+      updates.claudeOpusThinkingTokens = { increment: tokenUsage.claudeOpus.thinking || 0 };
+      updates.claudeOpusCost = { increment: cost.totalCost };
+      updates.tokensUsed = {
+        increment: (updates.tokensUsed?.increment || 0) + tokenUsage.claudeOpus.input + tokenUsage.claudeOpus.output,
+      };
+    }
+
+    // Legacy Claude (for backward compatibility - will use Sonnet pricing)
+    if (tokenUsage.claude) {
+      const cost = CostCalculator.calculateCost('claude-sonnet', {
+        inputTokens: tokenUsage.claude.input,
+        outputTokens: tokenUsage.claude.output,
+        thinkingTokens: tokenUsage.claude.thinking || 0,
+      });
+      totalCost += cost.totalCost;
+      updates.claudeSonnetInputTokens = { increment: tokenUsage.claude.input };
+      updates.claudeSonnetOutputTokens = { increment: tokenUsage.claude.output };
+      updates.claudeSonnetThinkingTokens = { increment: tokenUsage.claude.thinking || 0 };
+      updates.claudeSonnetCost = { increment: cost.totalCost };
       updates.tokensUsed = {
         increment: (updates.tokensUsed?.increment || 0) + tokenUsage.claude.input + tokenUsage.claude.output,
       };
@@ -219,10 +256,14 @@ export class UsageService {
         openaiInputTokens: tokenUsage.openai?.input || 0,
         openaiOutputTokens: tokenUsage.openai?.output || 0,
         openaiCost: updates.openaiCost?.increment || 0,
-        claudeInputTokens: tokenUsage.claude?.input || 0,
-        claudeOutputTokens: tokenUsage.claude?.output || 0,
-        claudeThinkingTokens: tokenUsage.claude?.thinking || 0,
-        claudeCost: updates.claudeCost?.increment || 0,
+        claudeSonnetInputTokens: tokenUsage.claudeSonnet?.input || tokenUsage.claude?.input || 0,
+        claudeSonnetOutputTokens: tokenUsage.claudeSonnet?.output || tokenUsage.claude?.output || 0,
+        claudeSonnetThinkingTokens: tokenUsage.claudeSonnet?.thinking || tokenUsage.claude?.thinking || 0,
+        claudeSonnetCost: updates.claudeSonnetCost?.increment || 0,
+        claudeOpusInputTokens: tokenUsage.claudeOpus?.input || 0,
+        claudeOpusOutputTokens: tokenUsage.claudeOpus?.output || 0,
+        claudeOpusThinkingTokens: tokenUsage.claudeOpus?.thinking || 0,
+        claudeOpusCost: updates.claudeOpusCost?.increment || 0,
         totalMonthlyCost: totalCost,
       },
       update: updates,
@@ -242,6 +283,8 @@ export class UsageService {
       geminiPro?: { input: number; output: number };
       openai?: { input: number; output: number };
       claude?: { input: number; output: number; thinking?: number };
+      claudeSonnet?: { input: number; output: number; thinking?: number };
+      claudeOpus?: { input: number; output: number; thinking?: number };
     },
     totalCost: number
   ): Promise<void> {
@@ -277,15 +320,41 @@ export class UsageService {
       updates.openaiCost = { increment: cost.totalCost };
     }
 
+    if (tokenUsage.claudeSonnet) {
+      const cost = CostCalculator.calculateCost('claude-sonnet', {
+        inputTokens: tokenUsage.claudeSonnet.input,
+        outputTokens: tokenUsage.claudeSonnet.output,
+        thinkingTokens: tokenUsage.claudeSonnet.thinking || 0,
+      });
+      updates.claudeSonnetInputTokens = { increment: tokenUsage.claudeSonnet.input };
+      updates.claudeSonnetOutputTokens = { increment: tokenUsage.claudeSonnet.output };
+      updates.claudeSonnetThinkingTokens = { increment: tokenUsage.claudeSonnet.thinking || 0 };
+      updates.claudeSonnetCost = { increment: cost.totalCost };
+    }
+
+    if (tokenUsage.claudeOpus) {
+      const cost = CostCalculator.calculateCost('claude-opus', {
+        inputTokens: tokenUsage.claudeOpus.input,
+        outputTokens: tokenUsage.claudeOpus.output,
+        thinkingTokens: tokenUsage.claudeOpus.thinking || 0,
+      });
+      updates.claudeOpusInputTokens = { increment: tokenUsage.claudeOpus.input };
+      updates.claudeOpusOutputTokens = { increment: tokenUsage.claudeOpus.output };
+      updates.claudeOpusThinkingTokens = { increment: tokenUsage.claudeOpus.thinking || 0 };
+      updates.claudeOpusCost = { increment: cost.totalCost };
+    }
+
+    // Legacy Claude (for backward compatibility - will use Sonnet pricing)
     if (tokenUsage.claude) {
-      const cost = CostCalculator.calculateCost('claude-3.5-sonnet', {
+      const cost = CostCalculator.calculateCost('claude-sonnet', {
         inputTokens: tokenUsage.claude.input,
         outputTokens: tokenUsage.claude.output,
+        thinkingTokens: tokenUsage.claude.thinking || 0,
       });
-      updates.claudeInputTokens = { increment: tokenUsage.claude.input };
-      updates.claudeOutputTokens = { increment: tokenUsage.claude.output };
-      updates.claudeThinkingTokens = { increment: tokenUsage.claude.thinking || 0 };
-      updates.claudeCost = { increment: cost.totalCost };
+      updates.claudeSonnetInputTokens = { increment: tokenUsage.claude.input };
+      updates.claudeSonnetOutputTokens = { increment: tokenUsage.claude.output };
+      updates.claudeSonnetThinkingTokens = { increment: tokenUsage.claude.thinking || 0 };
+      updates.claudeSonnetCost = { increment: cost.totalCost };
     }
 
     updates.totalMonthlyCost = { increment: totalCost };
@@ -303,10 +372,14 @@ export class UsageService {
         openaiInputTokens: tokenUsage.openai?.input || 0,
         openaiOutputTokens: tokenUsage.openai?.output || 0,
         openaiCost: updates.openaiCost?.increment || 0,
-        claudeInputTokens: tokenUsage.claude?.input || 0,
-        claudeOutputTokens: tokenUsage.claude?.output || 0,
-        claudeThinkingTokens: tokenUsage.claude?.thinking || 0,
-        claudeCost: updates.claudeCost?.increment || 0,
+        claudeSonnetInputTokens: tokenUsage.claudeSonnet?.input || tokenUsage.claude?.input || 0,
+        claudeSonnetOutputTokens: tokenUsage.claudeSonnet?.output || tokenUsage.claude?.output || 0,
+        claudeSonnetThinkingTokens: tokenUsage.claudeSonnet?.thinking || tokenUsage.claude?.thinking || 0,
+        claudeSonnetCost: updates.claudeSonnetCost?.increment || 0,
+        claudeOpusInputTokens: tokenUsage.claudeOpus?.input || 0,
+        claudeOpusOutputTokens: tokenUsage.claudeOpus?.output || 0,
+        claudeOpusThinkingTokens: tokenUsage.claudeOpus?.thinking || 0,
+        claudeOpusCost: updates.claudeOpusCost?.increment || 0,
         totalMonthlyCost: totalCost,
       },
       update: updates,

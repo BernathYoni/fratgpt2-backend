@@ -92,8 +92,13 @@ export async function adminRoutes(server: FastifyInstance) {
             costKey = 'OPENAI_PRO';
           }
         } else if (msg.provider === 'CLAUDE') {
-          modelName = 'Claude Sonnet 4.5';
-          costKey = 'CLAUDE';
+          if (mode === 'EXPERT') {
+            modelName = 'Claude Opus 4.5';
+            costKey = 'CLAUDE_OPUS';
+          } else {
+            modelName = 'Claude Sonnet 4.5';
+            costKey = 'CLAUDE_SONNET';
+          }
         }
 
         // Calculate Cost
@@ -276,9 +281,12 @@ export async function adminRoutes(server: FastifyInstance) {
           geminiProOutputTokens: true,
           openaiInputTokens: true,
           openaiOutputTokens: true,
-          claudeInputTokens: true,
-          claudeOutputTokens: true,
-          claudeThinkingTokens: true,
+          claudeSonnetInputTokens: true,
+          claudeSonnetOutputTokens: true,
+          claudeSonnetThinkingTokens: true,
+          claudeOpusInputTokens: true,
+          claudeOpusOutputTokens: true,
+          claudeOpusThinkingTokens: true,
         },
       });
 
@@ -289,17 +297,21 @@ export async function adminRoutes(server: FastifyInstance) {
         geminiProOutputTokens: usageAggregation._sum.geminiProOutputTokens || 0,
         openaiInputTokens: usageAggregation._sum.openaiInputTokens || 0,
         openaiOutputTokens: usageAggregation._sum.openaiOutputTokens || 0,
-        claudeInputTokens: usageAggregation._sum.claudeInputTokens || 0,
-        claudeOutputTokens: usageAggregation._sum.claudeOutputTokens || 0,
-        claudeThinkingTokens: usageAggregation._sum.claudeThinkingTokens || 0,
+        claudeSonnetInputTokens: usageAggregation._sum.claudeSonnetInputTokens || 0,
+        claudeSonnetOutputTokens: usageAggregation._sum.claudeSonnetOutputTokens || 0,
+        claudeSonnetThinkingTokens: usageAggregation._sum.claudeSonnetThinkingTokens || 0,
+        claudeOpusInputTokens: usageAggregation._sum.claudeOpusInputTokens || 0,
+        claudeOpusOutputTokens: usageAggregation._sum.claudeOpusOutputTokens || 0,
+        claudeOpusThinkingTokens: usageAggregation._sum.claudeOpusThinkingTokens || 0,
       });
 
       const geminiTotalCost = costs.geminiFlash.cost + costs.geminiPro.cost;
+      const claudeTotalCost = costs.claudeSonnet.cost + costs.claudeOpus.cost;
       const totalCost = costs.total.cost;
-      
+
       const geminiPercent = totalCost > 0 ? (geminiTotalCost / totalCost) * 100 : 0;
       const openaiPercent = totalCost > 0 ? (costs.openai.cost / totalCost) * 100 : 0;
-      const claudePercent = totalCost > 0 ? (costs.claude.cost / totalCost) * 100 : 0;
+      const claudePercent = totalCost > 0 ? (claudeTotalCost / totalCost) * 100 : 0;
 
       // 2. Calculate Cost Percentage of Revenue
       // avoid division by zero
@@ -325,7 +337,7 @@ export async function adminRoutes(server: FastifyInstance) {
             percentage: openaiPercent,
           },
           claude: {
-            cost: costs.claude.cost,
+            cost: claudeTotalCost,
             percentage: claudePercent,
           }
         }
@@ -585,7 +597,7 @@ const resetStatsSchema = z.object({
              } else if (r.provider === 'OPENAI') {
                 modelKey = msg.chatSession.mode === 'REGULAR' ? 'OPENAI_MINI' : 'OPENAI_PRO';
              } else if (r.provider === 'CLAUDE') {
-                modelKey = 'CLAUDE';
+                modelKey = msg.chatSession.mode === 'EXPERT' ? 'CLAUDE_OPUS' : 'CLAUDE_SONNET';
              }
              
              cost = CostCalculator.calculateModelCost(modelKey as any, {
