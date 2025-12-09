@@ -1,3 +1,4 @@
+// FratGPT 2.0 Backend Server - College feature deployment
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
