@@ -10,6 +10,8 @@ const createAffiliateSchema = z.object({
   code: z.string().min(3).optional(), // Affiliate code, e.g., MIKEFREE
   payoutRate: z.number().min(0).optional(),
   paymentManager: z.string().optional(),
+  phoneNumber: z.string().optional(),
+  venmoHandle: z.string().optional(),
 });
 
 const updateAffiliateSchema = z.object({
@@ -17,6 +19,8 @@ const updateAffiliateSchema = z.object({
   payoutRate: z.number().min(0).optional(),
   amountPaid: z.number().min(0).optional(),
   paymentManager: z.string().optional(),
+  phoneNumber: z.string().optional(),
+  venmoHandle: z.string().optional(),
 });
 
 export async function affiliateRoutes(server: FastifyInstance) {
@@ -24,7 +28,7 @@ export async function affiliateRoutes(server: FastifyInstance) {
   server.post('/', { preHandler: requireAdmin }, async (request, reply) => {
     try {
       server.log.info('[ADMIN/AFFILIATES] Creating new affiliate');
-      const { name, code, payoutRate, paymentManager } = createAffiliateSchema.parse(request.body);
+      const { name, code, payoutRate, paymentManager, phoneNumber, venmoHandle } = createAffiliateSchema.parse(request.body);
 
       // Generate a unique code if not provided
       let affiliateCode = code;
@@ -74,6 +78,8 @@ export async function affiliateRoutes(server: FastifyInstance) {
           code: affiliateCode,
           payoutRate: payoutRate ?? 5.00,
           paymentManager,
+          phoneNumber,
+          venmoHandle,
           referralLink: `${process.env.FRONTEND_URL}/?ref=${affiliateCode}`,
           stripePromoId: stripePromo.id,
           stripeCouponId: baseCouponId,
@@ -157,7 +163,7 @@ export async function affiliateRoutes(server: FastifyInstance) {
     const { id } = request.params as { id: string };
     try {
       server.log.info(`[ADMIN/AFFILIATES] Updating affiliate ${id}`);
-      const { name, payoutRate, paymentManager } = updateAffiliateSchema.parse(request.body);
+      const { name, payoutRate, paymentManager, phoneNumber, venmoHandle } = updateAffiliateSchema.parse(request.body);
 
       const affiliate = await prisma.affiliate.findUnique({ where: { id } });
       if (!affiliate) {
@@ -170,6 +176,8 @@ export async function affiliateRoutes(server: FastifyInstance) {
           name: name ?? undefined,
           payoutRate: payoutRate ?? undefined,
           paymentManager: paymentManager ?? undefined,
+          phoneNumber: phoneNumber ?? undefined,
+          venmoHandle: venmoHandle ?? undefined,
         },
       });
 
