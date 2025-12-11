@@ -52,6 +52,15 @@ async function start() {
       return { status: 'ok', timestamp: new Date().toISOString() };
     });
 
+    // Root path handler
+    server.get('/', async () => {
+      return { 
+        name: 'FratGPT 2.0 API', 
+        status: 'running', 
+        docs: 'https://github.com/BernathYoni/fratgpt2-monorepo' 
+      };
+    });
+
     // Register routes
     await server.register(authRoutes, { prefix: '/auth' });
     await server.register(chatRoutes, { prefix: '/chat' });

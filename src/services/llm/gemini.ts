@@ -91,6 +91,18 @@ export class GeminiProvider implements LLMProvider {
     console.log(`[GEMINI] [${new Date().toISOString()}] [${requestId}] 📥 Received response from Gemini API in ${apiDuration}ms`);
     
     const response = result.response;
+
+    // Log the full response object for debugging
+    console.log('[GEMINI] 📝 FULL RESPONSE OBJECT:');
+    console.dir(response, { depth: 5 }); // Use console.dir for objects, increased depth
+
+    // Check if candidates exist and if finishReason indicates issues
+    if (response.candidates && response.candidates.length === 0) {
+      console.warn('[GEMINI] ⚠️  Response has no candidates.');
+    } else if (response.candidates && response.candidates[0].finishReason) {
+      console.warn(`[GEMINI] ⚠️  Candidate finishReason: ${response.candidates[0].finishReason}`);
+    }
+
     let text;
     try {
       text = response.text();
