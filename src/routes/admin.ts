@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../db/client';
 import { requireAdmin } from '../middleware/requireAdmin';
 import { CostCalculator } from '../utils/costCalculator';
+import geoip from 'geoip-lite';
 
 const dateRangeSchema = z.object({
   startDate: z.string().datetime(),
@@ -621,6 +622,15 @@ const resetStatsSchema = z.object({
           };
         });
         
+        // GeoIP Lookup
+        let location = 'Unknown';
+        if (msg.chatSession.ipAddress) {
+          const geo = geoip.lookup(msg.chatSession.ipAddress);
+          if (geo) {
+            location = `${geo.city || geo.region}, ${geo.country}`;
+          }
+        }
+
         return {
           id: msg.id,
           createdAt: msg.createdAt,
@@ -631,6 +641,7 @@ const resetStatsSchema = z.object({
           mode: msg.chatSession.mode,
           sourceUrl: msg.chatSession.sourceUrl,
           ipAddress: msg.chatSession.ipAddress,
+          location: location, // New field
           interactions: msg.chatSession.interactions,
           input: {
             text: msg.content,
