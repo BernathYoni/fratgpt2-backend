@@ -33,6 +33,7 @@
     "dotenv": "^16.4.1",
     "fastify": "^4.26.1",
     "geoip-lite": "^1.4.10",
+    "ioredis": "^5.8.2",
     "openai": "^4.28.0",
     "prisma": "^5.9.0",
     "stripe": "^14.14.0",

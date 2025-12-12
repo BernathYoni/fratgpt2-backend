@@ -1,6 +1,7 @@
 import { prisma } from '../db/client';
 import { Plan, ChatMode } from '@prisma/client';
 import { CostCalculator } from '../utils/costCalculator';
+import { redis } from '../lib/redis';
 
 // Plan limits (monthly)
 const PLAN_LIMITS = {
@@ -72,17 +73,50 @@ export class UsageService {
       };
     }
 
-    // Get monthly usage (all records for current month)
-    const monthlyUsage = await prisma.usage.findMany({
-      where: {
-        userId,
-        date: { gte: currentMonth },
-      },
-    });
+    // Try to get usage from Redis first
+    let totalSolves = 0;
+    let totalCost = 0;
+    let cacheHit = false;
+    const redisKey = `usage:${userId}:${currentMonth.toISOString()}`;
+
+    if (redis) {
+      try {
+        const cached = await redis.get(redisKey);
+        if (cached) {
+          const data = JSON.parse(cached);
+          totalSolves = data.solves;
+          totalCost = data.cost;
+          cacheHit = true;
+        }
+      } catch (err) {
+        console.warn('[UsageService] Redis error:', err);
+      }
+    }
+
+    if (!cacheHit) {
+      // Get monthly usage (all records for current month) from DB
+      const monthlyUsage = await prisma.usage.findMany({
+        where: {
+          userId,
+          date: { gte: currentMonth },
+        },
+      });
+
+      totalSolves = monthlyUsage.reduce((sum, u) => sum + u.solvesUsed, 0);
+      totalCost = monthlyUsage.reduce((sum, u) => sum + u.totalMonthlyCost, 0);
+
+      // Cache the result
+      if (redis) {
+        try {
+          await redis.set(redisKey, JSON.stringify({ solves: totalSolves, cost: totalCost }), 'EX', 3600);
+        } catch (err) {
+          console.warn('[UsageService] Redis set error:', err);
+        }
+      }
+    }
 
     if (planConfig.type === 'solves') {
       // FREE plan: count total solves this month
-      const totalSolves = monthlyUsage.reduce((sum, u) => sum + u.solvesUsed, 0);
       const remaining = Math.max(0, planConfig.limit - totalSolves);
 
       return {
@@ -96,7 +130,6 @@ export class UsageService {
       };
     } else {
       // BASIC/PRO plan: check monthly cost
-      const totalCost = monthlyUsage.reduce((sum, u) => sum + u.totalMonthlyCost, 0);
       const remaining = Math.max(0, planConfig.limit - totalCost);
 
       return {
@@ -271,6 +304,17 @@ export class UsageService {
 
     // Also update AdminStats
     await this.updateAdminStats(today, tokenUsage, totalCost);
+
+    // Invalidate Redis cache for this user's monthly usage
+    if (redis) {
+      try {
+        const monthStart = this.getMonthStart();
+        const redisKey = `usage:${userId}:${monthStart.toISOString()}`;
+        await redis.del(redisKey);
+      } catch (err) {
+        console.warn('[UsageService] Redis delete error:', err);
+      }
+    }
   }
 
   /**
