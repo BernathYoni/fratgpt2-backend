@@ -825,4 +825,65 @@ const resetStatsSchema = z.object({
       return reply.code(500).send({ error: 'Internal server error' });
     }
   });
+
+  /**
+   * GET /admin/map-activity
+   */
+  server.get('/map-activity', { preHandler: requireAdmin }, async (request, reply) => {
+    try {
+      // Fetch recent solves (User messages with attachments)
+      const limit = 100;
+      
+      const userMessages = await prisma.message.findMany({
+        where: { 
+          role: 'USER',
+          attachments: { some: {} } // Only solves with images
+        },
+        include: {
+          chatSession: {
+            select: { 
+              ipAddress: true,
+              mode: true,
+              user: { select: { email: true } }
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit
+      });
+
+      const activity = userMessages.map(msg => {
+        let lat = null;
+        let lng = null;
+        let location = 'Unknown';
+
+        if (msg.chatSession.ipAddress) {
+          const geo = geoip.lookup(msg.chatSession.ipAddress);
+          if (geo) {
+            lat = geo.ll[0];
+            lng = geo.ll[1];
+            location = `${geo.city || geo.region}, ${geo.country}`;
+          }
+        }
+
+        if (!lat || !lng) return null;
+
+        return {
+          id: msg.id,
+          lat,
+          lng,
+          location,
+          mode: msg.chatSession.mode,
+          timestamp: msg.createdAt,
+          userEmail: msg.chatSession.user.email
+        };
+      }).filter(item => item !== null);
+
+      return reply.send({ activity });
+
+    } catch (error) {
+      server.log.error(error);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
 }
