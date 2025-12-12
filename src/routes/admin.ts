@@ -662,4 +662,156 @@ const resetStatsSchema = z.object({
       return reply.code(500).send({ error: 'Internal server error' });
     }
   });
+
+  /**
+   * GET /admin/stats/misc
+   */
+  server.get('/stats/misc', { preHandler: requireAdmin }, async (request, reply) => {
+    try {
+      const { startDate, endDate } = dateRangeSchema.parse(request.query);
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+
+      // 1. Fetch User Messages with Attachments (Solves that are Snip or Screen)
+      const userMessages = await prisma.message.findMany({
+        where: {
+          role: 'USER',
+          createdAt: { gte: start, lte: end },
+          attachments: { some: {} } // Has attachments
+        },
+        include: {
+          chatSession: {
+             select: { mode: true }
+          },
+          attachments: {
+             select: { source: true }
+          }
+        }
+      });
+
+      // 2. Fetch all Assistant Messages in the time range to calculate costs
+      // We need to match them to the user messages.
+      // Optimization: Fetch all assistant messages in relevant sessions
+      const relevantSessionIds = [...new Set(userMessages.map(m => m.chatSessionId))];
+      
+      const assistantMessages = await prisma.message.findMany({
+        where: {
+          role: 'ASSISTANT',
+          createdAt: { gte: start, lte: end },
+          chatSessionId: { in: relevantSessionIds }
+        },
+        select: {
+          chatSessionId: true,
+          provider: true,
+          metadata: true,
+          createdAt: true
+        }
+      });
+
+      // Group assistant messages by session ID
+      const sessionResponses: Record<string, typeof assistantMessages> = {};
+      for (const am of assistantMessages) {
+        if (!sessionResponses[am.chatSessionId]) sessionResponses[am.chatSessionId] = [];
+        sessionResponses[am.chatSessionId].push(am);
+      }
+
+      // 3. Aggregate Stats
+      let snipCount = 0;
+      let screenCount = 0;
+      let snipTotalCost = 0;
+      let screenTotalCost = 0;
+
+      // Mode-specific stats for Snips
+      const snipModeStats: Record<string, { count: number, cost: number }> = {
+        FAST: { count: 0, cost: 0 },
+        REGULAR: { count: 0, cost: 0 },
+        EXPERT: { count: 0, cost: 0 }
+      };
+
+      for (const userMsg of userMessages) {
+        const attachment = userMsg.attachments[0];
+        if (!attachment || !attachment.source) continue;
+
+        const source = attachment.source; // 'SNIP' | 'SCREEN'
+        const mode = userMsg.chatSession.mode; // 'FAST' | 'REGULAR' | 'EXPERT'
+
+        // Calculate cost for this "solve" (User Message)
+        // We sum cost of assistant messages in the same session created AFTER this user message
+        const responses = sessionResponses[userMsg.chatSessionId] || [];
+        // Filter responses that are after this user message (and ideally before the next user message, but simple "after" is okay for stats)
+        const relevantResponses = responses.filter(r => r.createdAt > userMsg.createdAt);
+
+        let solveCost = 0;
+        for (const r of relevantResponses) {
+          const meta = r.metadata as any;
+          if (meta?.tokenUsage && r.provider) {
+             let costKey = 'GEMINI_PRO';
+             if (r.provider === 'GEMINI') {
+                if (mode === 'FAST') costKey = 'GEMINI_FLASH';
+                else if (mode === 'REGULAR') costKey = 'GEMINI_PRO';
+                else costKey = 'GEMINI_EXPERT';
+             } else if (r.provider === 'OPENAI') {
+                costKey = mode === 'REGULAR' ? 'OPENAI_MINI' : 'OPENAI_PRO';
+             } else if (r.provider === 'CLAUDE') {
+                costKey = mode === 'EXPERT' ? 'CLAUDE_OPUS' : 'CLAUDE_SONNET';
+             }
+
+             solveCost += CostCalculator.calculateModelCost(costKey as any, {
+                inputTokens: meta.tokenUsage.inputTokens || 0,
+                outputTokens: meta.tokenUsage.outputTokens || 0,
+                thinkingTokens: meta.tokenUsage.thinkingTokens || 0
+             });
+          }
+        }
+
+        // Add to aggregators
+        if (source === 'SNIP') {
+          snipCount++;
+          snipTotalCost += solveCost;
+          if (snipModeStats[mode]) {
+            snipModeStats[mode].count++;
+            snipModeStats[mode].cost += solveCost;
+          }
+        } else if (source === 'SCREEN') {
+          screenCount++;
+          screenTotalCost += solveCost;
+        }
+      }
+
+      return reply.send({
+        snips: {
+          count: snipCount,
+          totalCost: snipTotalCost,
+          avgCost: snipCount > 0 ? snipTotalCost / snipCount : 0,
+          modes: {
+            FAST: {
+               avgCost: snipModeStats.FAST.count > 0 ? snipModeStats.FAST.cost / snipModeStats.FAST.count : 0,
+               count: snipModeStats.FAST.count
+            },
+            REGULAR: {
+               avgCost: snipModeStats.REGULAR.count > 0 ? snipModeStats.REGULAR.cost / snipModeStats.REGULAR.count : 0,
+               count: snipModeStats.REGULAR.count
+            },
+            EXPERT: {
+               avgCost: snipModeStats.EXPERT.count > 0 ? snipModeStats.EXPERT.cost / snipModeStats.EXPERT.count : 0,
+               count: snipModeStats.EXPERT.count
+            }
+          }
+        },
+        screens: {
+          count: screenCount,
+          totalCost: screenTotalCost,
+          avgCost: screenCount > 0 ? screenTotalCost / screenCount : 0
+        },
+        totalSolves: snipCount + screenCount
+      });
+
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return reply.code(400).send({ error: 'Invalid input', details: error.errors });
+      }
+      server.log.error(error);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
 }
