@@ -14,6 +14,9 @@
  * - Gemini 3.0 (gemini-exp-1206): $10.00 input, $40.00 output (estimated)
  * - GPT-5.1 (gpt-5.1): $1.25 input, $10.00 output (GPT-5 pricing as proxy)
  * - Claude 4.5 Opus: $5.00 input, $25.00 output, $6.25 thinking (estimated)
+ * 
+ * ADMIN CHATBOT:
+ * - GPT-5.1 (gpt-5.1): $1.25 input, $10.00 output
  */
 
 export interface TokenCosts {
@@ -36,6 +39,7 @@ export interface TotalCosts {
   openai: ModelCost;
   claudeSonnet: ModelCost;
   claudeOpus: ModelCost;
+  adminChatbot: ModelCost;
   total: {
     cost: number;
     tokens: number | bigint;
@@ -63,6 +67,10 @@ export class CostCalculator {
     },
     OPENAI_PRO: {
       INPUT: 1.25,   // $1.25 per 1M input tokens (GPT-5.1)
+      OUTPUT: 10.00, // $10.00 per 1M output tokens
+    },
+    OPENAI_ADMIN: {
+      INPUT: 1.25,   // $1.25 per 1M input tokens (GPT-5.1 for Admin)
       OUTPUT: 10.00, // $10.00 per 1M output tokens
     },
     CLAUDE_SONNET: {
@@ -126,7 +134,7 @@ export class CostCalculator {
    * Calculate cost for a specific model
    */
   static calculateModelCost(
-    model: 'GEMINI_FLASH' | 'GEMINI_PRO' | 'GEMINI_EXPERT' | 'OPENAI_MINI' | 'OPENAI_PRO' | 'CLAUDE_SONNET' | 'CLAUDE_OPUS',
+    model: 'GEMINI_FLASH' | 'GEMINI_PRO' | 'GEMINI_EXPERT' | 'OPENAI_MINI' | 'OPENAI_PRO' | 'CLAUDE_SONNET' | 'CLAUDE_OPUS' | 'OPENAI_ADMIN',
     tokens: TokenCosts
   ): number {
     // Fallback for old keys if necessary or just strict typing
@@ -170,6 +178,9 @@ export class CostCalculator {
     claudeOpusInputTokens: number | bigint;
     claudeOpusOutputTokens: number | bigint;
     claudeOpusThinkingTokens: number | bigint;
+    // Admin Chatbot
+    adminChatbotInputTokens?: number | bigint;
+    adminChatbotOutputTokens?: number | bigint;
   }): TotalCosts {
     // Calculate per-model costs
     const geminiFlashCost = this.calculateModelCost('GEMINI_FLASH', {
@@ -182,9 +193,6 @@ export class CostCalculator {
       outputTokens: data.geminiProOutputTokens,
     });
 
-    // Note: Usage table aggregates all OpenAI tokens into one field.
-    // We default to PRO pricing to be safe/conservative, or because most traffic might be Expert?
-    // Actually, if we can't distinguish, we should probably stick to the previous behavior (High price).
     const openaiCost = this.calculateModelCost('OPENAI_PRO', {
       inputTokens: data.openaiInputTokens,
       outputTokens: data.openaiOutputTokens,
@@ -202,8 +210,13 @@ export class CostCalculator {
       thinkingTokens: data.claudeOpusThinkingTokens,
     });
 
+    const adminChatbotCost = this.calculateModelCost('OPENAI_ADMIN', {
+      inputTokens: data.adminChatbotInputTokens || 0,
+      outputTokens: data.adminChatbotOutputTokens || 0,
+    });
+
     // Calculate total cost
-    const totalCost = geminiFlashCost + geminiProCost + openaiCost + claudeSonnetCost + claudeOpusCost;
+    const totalCost = geminiFlashCost + geminiProCost + openaiCost + claudeSonnetCost + claudeOpusCost + adminChatbotCost;
 
     // Calculate total tokens
     const totalTokens =
@@ -211,7 +224,8 @@ export class CostCalculator {
       Number(data.geminiProInputTokens) + Number(data.geminiProOutputTokens) +
       Number(data.openaiInputTokens) + Number(data.openaiOutputTokens) +
       Number(data.claudeSonnetInputTokens) + Number(data.claudeSonnetOutputTokens) + Number(data.claudeSonnetThinkingTokens) +
-      Number(data.claudeOpusInputTokens) + Number(data.claudeOpusOutputTokens) + Number(data.claudeOpusThinkingTokens);
+      Number(data.claudeOpusInputTokens) + Number(data.claudeOpusOutputTokens) + Number(data.claudeOpusThinkingTokens) +
+      Number(data.adminChatbotInputTokens || 0) + Number(data.adminChatbotOutputTokens || 0);
 
     return {
       geminiFlash: {
@@ -246,6 +260,12 @@ export class CostCalculator {
         cost: claudeOpusCost,
         percentageOfTotal: totalCost > 0 ? (claudeOpusCost / totalCost) * 100 : 0,
       },
+      adminChatbot: {
+        inputTokens: data.adminChatbotInputTokens || 0,
+        outputTokens: data.adminChatbotOutputTokens || 0,
+        cost: adminChatbotCost,
+        percentageOfTotal: totalCost > 0 ? (adminChatbotCost / totalCost) * 100 : 0,
+      },
       total: {
         cost: totalCost,
         tokens: totalTokens,
@@ -270,6 +290,8 @@ export class CostCalculator {
       claudeOpusInputTokens: number | bigint;
       claudeOpusOutputTokens: number | bigint;
       claudeOpusThinkingTokens: number | bigint;
+      adminChatbotInputTokens?: number | bigint;
+      adminChatbotOutputTokens?: number | bigint;
     }>
   ): TotalCosts {
     // Sum up all token counts
@@ -287,6 +309,8 @@ export class CostCalculator {
         claudeOpusInputTokens: BigInt(acc.claudeOpusInputTokens) + BigInt(record.claudeOpusInputTokens),
         claudeOpusOutputTokens: BigInt(acc.claudeOpusOutputTokens) + BigInt(record.claudeOpusOutputTokens),
         claudeOpusThinkingTokens: BigInt(acc.claudeOpusThinkingTokens) + BigInt(record.claudeOpusThinkingTokens),
+        adminChatbotInputTokens: BigInt(acc.adminChatbotInputTokens) + BigInt(record.adminChatbotInputTokens || 0),
+        adminChatbotOutputTokens: BigInt(acc.adminChatbotOutputTokens) + BigInt(record.adminChatbotOutputTokens || 0),
       }),
       {
         geminiFlashInputTokens: 0n,
@@ -301,6 +325,8 @@ export class CostCalculator {
         claudeOpusInputTokens: 0n,
         claudeOpusOutputTokens: 0n,
         claudeOpusThinkingTokens: 0n,
+        adminChatbotInputTokens: 0n,
+        adminChatbotOutputTokens: 0n,
       }
     );
 

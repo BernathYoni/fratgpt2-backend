@@ -246,6 +246,12 @@ model Usage {
   claudeOpusOutputTokens     Int   @default(0)
   claudeOpusThinkingTokens   Int   @default(0)
   claudeOpusCost             Float @default(0)
+  
+  // Admin Chatbot Usage
+  adminChatbotInputTokens    Int   @default(0)
+  adminChatbotOutputTokens   Int   @default(0)
+  adminChatbotCost           Float @default(0)
+
   totalMonthlyCost           Float @default(0)
 
   user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -277,6 +283,12 @@ model AdminStats {
   claudeOpusOutputTokens     BigInt @default(0)
   claudeOpusThinkingTokens   BigInt @default(0)
   claudeOpusCost             Float  @default(0)
+
+  // Admin Chatbot Usage
+  adminChatbotInputTokens    BigInt @default(0)
+  adminChatbotOutputTokens   BigInt @default(0)
+  adminChatbotCost           Float  @default(0)
+
   totalMonthlyCost           Float  @default(0)
 
   createdAt          DateTime @default(now())

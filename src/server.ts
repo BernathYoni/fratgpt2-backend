@@ -9,6 +9,7 @@ import { billingRoutes } from './routes/billing';
 import { webhookRoutes } from './routes/webhooks';
 import { usageRoutes } from './routes/usage';
 import { adminRoutes } from './routes/admin';
+import { adminCopilotRoutes } from './routes/admin-copilot';
 import { affiliateRoutes } from './routes/affiliates';
 import { collegeRoutes, publicCollegeRoutes } from './routes/colleges';
 
@@ -68,6 +69,7 @@ async function start() {
     await server.register(usageRoutes, { prefix: '/usage' });
     await server.register(webhookRoutes, { prefix: '/webhooks' });
     await server.register(adminRoutes, { prefix: '/admin' });
+    await server.register(adminCopilotRoutes, { prefix: '/admin' });
     await server.register(affiliateRoutes, { prefix: '/admin/affiliates' });
     await server.register(collegeRoutes, { prefix: '/admin/colleges' });
 
