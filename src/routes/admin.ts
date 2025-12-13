@@ -434,6 +434,11 @@ const resetStatsSchema = z.object({
             take: 1,
           },
           usage: true,
+          chatSessions: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { ipAddress: true }
+          }
         },
         orderBy: { createdAt: 'desc' },
         take: Number(limit),
@@ -495,6 +500,18 @@ const resetStatsSchema = z.object({
         
         const averageMonthlyUsagePercent = monthsCount > 0 ? totalPercent / monthsCount : 0;
 
+        // GeoIP Lookup for User
+        const lastSession = user.chatSessions[0];
+        const lastIp = lastSession?.ipAddress || null;
+        let location = 'Unknown';
+        
+        if (lastIp) {
+           const geo = geoip.lookup(lastIp);
+           if (geo) {
+             location = `${geo.city || geo.region}, ${geo.country}`;
+           }
+        }
+
         return {
           id: user.id,
           email: user.email,
@@ -506,6 +523,8 @@ const resetStatsSchema = z.object({
           lifetimeSolves,
           usageThisMonthPercent,
           averageMonthlyUsagePercent,
+          lastIp,
+          location,
         };
       });
 
