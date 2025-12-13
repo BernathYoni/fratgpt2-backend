@@ -309,8 +309,8 @@ export class CostCalculator {
         claudeOpusInputTokens: BigInt(acc.claudeOpusInputTokens) + BigInt(record.claudeOpusInputTokens),
         claudeOpusOutputTokens: BigInt(acc.claudeOpusOutputTokens) + BigInt(record.claudeOpusOutputTokens),
         claudeOpusThinkingTokens: BigInt(acc.claudeOpusThinkingTokens) + BigInt(record.claudeOpusThinkingTokens),
-        adminChatbotInputTokens: BigInt(acc.adminChatbotInputTokens) + BigInt(record.adminChatbotInputTokens || 0),
-        adminChatbotOutputTokens: BigInt(acc.adminChatbotOutputTokens) + BigInt(record.adminChatbotOutputTokens || 0),
+        adminChatbotInputTokens: BigInt(acc.adminChatbotInputTokens as any) + BigInt((record.adminChatbotInputTokens || 0) as any),
+        adminChatbotOutputTokens: BigInt(acc.adminChatbotOutputTokens as any) + BigInt((record.adminChatbotOutputTokens || 0) as any),
       }),
       {
         geminiFlashInputTokens: 0n,
