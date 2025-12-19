@@ -143,4 +143,66 @@ export class GeminiProvider implements LLMProvider {
 
     return parsed;
   }
+
+  async *generateStream(messages: LLMMessage[], options?: LLMOptions): AsyncIterable<string | any> {
+    const requestId = options?.requestId || 'STREAM';
+    
+    // User requested "Gemini 3 Flash Preview" model ID
+    const modelName = 'gemini-3-flash-preview';
+
+    console.log(`[GEMINI] [${requestId}] 🌊 Starting stream with ${modelName}`);
+
+    const model = this.client.getGenerativeModel({ model: modelName });
+
+    // Modified System Prompt for Thinking
+    const streamSystemPrompt = SYSTEM_PROMPT + `
+    
+IMPORTANT: You must first output your step-by-step reasoning inside <thinking>...</thinking> XML tags, followed by the final user-facing answer inside <answer>...</answer> tags.
+`;
+
+    const parts: any[] = [];
+    parts.push({ text: streamSystemPrompt });
+
+    for (const msg of messages) {
+      if (msg.imageData) {
+        parts.push({
+          inlineData: {
+            mimeType: 'image/png',
+            data: msg.imageData.replace(/^data:image\/\w+;base64,/, ''),
+          },
+        });
+      }
+      parts.push({ text: `${msg.role}: ${msg.content}` });
+    }
+
+    try {
+      const result = await model.generateContentStream({
+        contents: [{ role: 'user', parts }],
+        generationConfig: {
+          temperature: options?.temperature || 0.7,
+          maxOutputTokens: options?.maxTokens || 4096, 
+          responseMimeType: 'text/plain', 
+        },
+      });
+
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text();
+        yield chunkText;
+      }
+
+      // Yield usage metadata at the end
+      const response = await result.response;
+      if (response.usageMetadata) {
+        yield {
+          inputTokens: response.usageMetadata.promptTokenCount,
+          outputTokens: response.usageMetadata.candidatesTokenCount,
+          totalTokens: response.usageMetadata.totalTokenCount
+        };
+      }
+
+    } catch (error: any) {
+      console.error('[GEMINI] ❌ Error in stream:', error);
+      throw error;
+    }
+  }
 }

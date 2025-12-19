@@ -65,6 +65,28 @@ export async function adminRoutes(server: FastifyInstance) {
         const metadata = msg.metadata as any;
         if (!metadata?.tokenUsage || !msg.provider) continue;
 
+        // Process Thinking Usage (Gemini 3 Flash)
+        if (metadata.thinkingUsage && msg.provider === 'GEMINI') {
+          const t = metadata.thinkingUsage;
+          const thinkingCost = CostCalculator.calculateModelCost('GEMINI_3_FLASH', {
+            inputTokens: t.inputTokens || 0,
+            outputTokens: t.outputTokens || 0
+          });
+          
+          const modelName = 'Gemini 3 Flash (Thinking)';
+          if (!breakdown.gemini.models[modelName]) {
+            breakdown.gemini.models[modelName] = { inputTokens: 0, outputTokens: 0, cost: 0 };
+          }
+          
+          breakdown.gemini.models[modelName].inputTokens += (t.inputTokens || 0);
+          breakdown.gemini.models[modelName].outputTokens += (t.outputTokens || 0);
+          breakdown.gemini.models[modelName].cost += thinkingCost;
+          
+          breakdown.gemini.totalCost += thinkingCost;
+          breakdown.gemini.totalTokens += (t.inputTokens || 0) + (t.outputTokens || 0);
+          totalCost += thinkingCost;
+        }
+
         const tokens = metadata.tokenUsage;
         const providerKey = msg.provider.toLowerCase();
         const mode = msg.chatSession.mode;

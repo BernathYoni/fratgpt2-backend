@@ -53,6 +53,7 @@ export interface LLMResponse {
 export interface LLMProvider {
   name: string;
   generate(messages: LLMMessage[], options?: LLMOptions): Promise<LLMResponse>;
+  generateStream?(messages: LLMMessage[], options?: LLMOptions): AsyncIterable<string | TokenUsage>;
 }
 
 export interface LLMOptions {

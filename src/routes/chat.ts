@@ -141,15 +141,7 @@ export async function chatRoutes(server: FastifyInstance) {
       });
       console.log(`[CHAT/START] [${new Date().toISOString()}] ✅ User message created in ${Date.now() - msgStart}ms, ID: ${userMessage.id}`);
 
-      // REGION DETECTION - DISABLED (not being used by frontend/extension)
-      // Saves ~2.1 seconds per request
-      let regionData = null;
-      console.log(`[CHAT/START] [${new Date().toISOString()}] ⏭️ Skipping region detection (feature disabled)`);
-
-      // TODO: Re-enable when implementing multi-question support
-      // if (RegionDetectionService.shouldDetectRegions(imageData, true)) {
-      //   ... region detection code ...
-      // }
+      let regionData = null; // Initialize regionData to prevent TS error after removing region detection block
 
       // Build LLM messages
       console.log(`[CHAT/START] [${new Date().toISOString()}] 🤖 Building LLM message array...`);
@@ -203,7 +195,10 @@ export async function chatRoutes(server: FastifyInstance) {
               content: provider.response.shortAnswer || 'No answer',
               shortAnswer: provider.response.shortAnswer,
               provider: provider.provider.toUpperCase() as any,
-              metadata: { ...(provider.error ? { error: provider.error } : {}), tokenUsage: provider.response.tokenUsage as any },
+              metadata: { 
+                ...(provider.error ? { error: provider.error } : {}), 
+                tokenUsage: provider.response.tokenUsage as any
+              },
               questionType,
               answerFormat,
               structuredAnswer: structuredAnswer as any,
@@ -354,6 +349,170 @@ export async function chatRoutes(server: FastifyInstance) {
       console.error('[CHAT/START] Sending 500 Internal Server Error');
       console.error('='.repeat(80) + '\n');
       return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // POST /chat/start-stream - Start a new chat session with SSE streaming
+  server.post('/start-stream', async (request, reply) => {
+    console.log('\n' + '='.repeat(80));
+    console.log(`[CHAT/START-STREAM] [${new Date().toISOString()}] 🚀 New streaming chat request`);
+
+    try {
+      // 1. Authenticate & Setup
+      const { userId } = await authenticate(request);
+      const { mode, message, imageData, captureSource, sourceUrl } = startChatSchema.parse(request.body);
+      const ipAddress = (request.headers['x-forwarded-for'] as string) || request.ip;
+
+      // Rate Limit Check
+      const limitCheck = await UsageService.checkLimit(userId, mode as ChatMode);
+      if (!limitCheck.modeAllowed) {
+        return reply.code(403).send({ error: limitCheck.modeRestrictionReason, code: 'MODE_RESTRICTED' });
+      }
+      if (!limitCheck.allowed) {
+        return reply.code(429).send({ error: 'Limit exceeded', code: 'LIMIT_EXCEEDED' });
+      }
+
+      // Create Session & User Message
+      const session = await prisma.chatSession.create({
+        data: { userId, mode: mode as ChatMode, title: message.substring(0, 50), sourceUrl, ipAddress },
+      });
+      await prisma.message.create({
+        data: {
+          chatSessionId: session.id,
+          role: 'USER',
+          content: message,
+          attachments: imageData ? { create: { type: 'IMAGE', source: captureSource || 'SCREEN', imageData } } : undefined,
+        },
+      });
+
+      // Prepare Headers for SSE
+      reply.raw.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+      });
+
+      const llmMessages: LLMMessage[] = [{ role: 'user', content: message, imageData }];
+
+      // 2. Start Final Answer Generation (Background)
+      const finalAnswerPromise = orchestrator.generate(mode as ChatMode, llmMessages);
+
+      // 3. Stream Thoughts (Foreground)
+      let thinkingUsage: any = null;
+      try {
+        for await (const chunk of orchestrator.streamThoughts(llmMessages)) {
+          if (typeof chunk === 'string') {
+            reply.raw.write(`event: thought\ndata: ${JSON.stringify(chunk)}\n\n`);
+          } else {
+            // Capture usage object
+            thinkingUsage = chunk;
+            console.log('[CHAT/START-STREAM] 🧠 Thinking Usage Captured:', thinkingUsage);
+          }
+        }
+      } catch (e) {
+        console.error('[CHAT/START-STREAM] Thinking stream error:', e);
+        reply.raw.write(`event: error\ndata: ${JSON.stringify({ error: 'Thinking stream failed' })}\n\n`);
+      }
+
+      // 4. Await Final Answer & Save
+      const result = await finalAnswerPromise;
+      let regionData = null; // Legacy placeholder
+
+      // Save Assistant Messages
+      if ((mode === 'EXPERT' || mode === 'REGULAR') && result.providers) {
+        for (const provider of result.providers) {
+           await prisma.message.create({
+            data: {
+              chatSessionId: session.id,
+              role: 'ASSISTANT',
+              content: provider.response.shortAnswer || 'No answer',
+              shortAnswer: provider.response.shortAnswer,
+              provider: provider.provider.toUpperCase() as any,
+              metadata: { 
+                ...(provider.error ? { error: provider.error } : {}), 
+                tokenUsage: provider.response.tokenUsage as any,
+                // Attach thinking usage to GEMINI provider only
+                ...(provider.provider.toUpperCase() === 'GEMINI' && thinkingUsage ? { thinkingUsage } : {})
+              },
+              questionType: provider.response.questionType,
+              structuredAnswer: provider.response.structuredAnswer as any,
+              confidence: provider.response.confidence,
+              questionRegions: regionData as any,
+            },
+          });
+        }
+      } else {
+        await prisma.message.create({
+          data: {
+            chatSessionId: session.id,
+            role: 'ASSISTANT',
+            content: result.primary.shortAnswer || 'No answer',
+            shortAnswer: result.primary.shortAnswer,
+            metadata: { 
+              tokenUsage: result.primary.tokenUsage as any,
+              ...(thinkingUsage ? { thinkingUsage } : {})
+            },
+            provider: 'GEMINI',
+            questionType: result.primary.questionType,
+            structuredAnswer: result.primary.structuredAnswer as any,
+            confidence: result.primary.confidence,
+            questionRegions: regionData as any,
+          },
+        });
+      }
+
+      // Usage Tracking
+      try {
+        const tokenUsage: any = {};
+        
+        // Add Thinking Usage (Gemini 3 Flash)
+        if (thinkingUsage) {
+            tokenUsage.gemini3Flash = { 
+                input: thinkingUsage.inputTokens, 
+                output: thinkingUsage.outputTokens 
+            };
+        }
+
+        // Add Chat Usage
+        if (mode === 'FAST' && result.primary?.tokenUsage) {
+            tokenUsage.geminiFlash = { input: result.primary.tokenUsage.inputTokens, output: result.primary.tokenUsage.outputTokens };
+        } else if ((mode === 'REGULAR' || mode === 'EXPERT') && result.providers) {
+             for (const provider of result.providers) {
+                if (provider.response.tokenUsage) {
+                  const tokens = provider.response.tokenUsage;
+                  if (provider.provider === 'gemini') tokenUsage.geminiPro = { input: tokens.inputTokens, output: tokens.outputTokens };
+                  else if (provider.provider === 'openai') tokenUsage.openai = { input: tokens.inputTokens, output: tokens.outputTokens };
+                  else if (provider.provider === 'claude') {
+                      if (mode === 'EXPERT') tokenUsage.claudeOpus = { input: tokens.inputTokens, output: tokens.outputTokens, thinking: tokens.thinkingTokens };
+                      else tokenUsage.claudeSonnet = { input: tokens.inputTokens, output: tokens.outputTokens, thinking: tokens.thinkingTokens };
+                  }
+                }
+             }
+        }
+        
+        await UsageService.incrementSolve(userId, mode as ChatMode, tokenUsage);
+      } catch (e) { console.error('Usage tracking failed', e); }
+
+      // Fetch Full Session
+      const fullSession = await prisma.chatSession.findUnique({
+        where: { id: session.id },
+        include: { messages: { include: { attachments: true }, orderBy: { createdAt: 'asc' } } },
+      });
+
+      // Send Final Result
+      reply.raw.write(`event: result\ndata: ${JSON.stringify(fullSession)}\n\n`);
+      reply.raw.write(`event: done\ndata: [DONE]\n\n`);
+      reply.raw.end();
+
+    } catch (error: any) {
+      console.error('[CHAT/START-STREAM] Critical Error:', error);
+      if (!reply.raw.headersSent) {
+          return reply.code(500).send({ error: 'Internal server error' });
+      } else {
+          reply.raw.write(`event: error\ndata: ${JSON.stringify({ error: 'Internal server error' })}\n\n`);
+          reply.raw.end();
+      }
     }
   });
 

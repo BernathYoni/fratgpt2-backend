@@ -154,6 +154,7 @@ export class UsageService {
     tokenUsage: {
       geminiFlash?: { input: number; output: number };
       geminiPro?: { input: number; output: number };
+      gemini3Flash?: { input: number; output: number }; // New: Thinking model
       openai?: { input: number; output: number };
       claude?: { input: number; output: number; thinking?: number };
       claudeSonnet?: { input: number; output: number; thinking?: number };
@@ -183,6 +184,20 @@ export class UsageService {
       updates.geminiFlashCost = { increment: cost.totalCost };
       updates.tokensUsed = {
         increment: tokenUsage.geminiFlash.input + tokenUsage.geminiFlash.output,
+      };
+    }
+
+    // Gemini 3 Flash (Thinking)
+    // Note: We track the COST for billing limits, but we don't have dedicated DB columns for these tokens yet.
+    // We add to totalMonthlyCost but skip specific token column updates to avoid polluting other stats.
+    if (tokenUsage.gemini3Flash) {
+      const cost = CostCalculator.calculateModelCost('GEMINI_3_FLASH', {
+        inputTokens: tokenUsage.gemini3Flash.input,
+        outputTokens: tokenUsage.gemini3Flash.output,
+      });
+      totalCost += cost;
+      updates.tokensUsed = {
+        increment: (updates.tokensUsed?.increment || 0) + tokenUsage.gemini3Flash.input + tokenUsage.gemini3Flash.output,
       };
     }
 
@@ -325,6 +340,7 @@ export class UsageService {
     tokenUsage: {
       geminiFlash?: { input: number; output: number };
       geminiPro?: { input: number; output: number };
+      gemini3Flash?: { input: number; output: number };
       openai?: { input: number; output: number };
       claude?: { input: number; output: number; thinking?: number };
       claudeSonnet?: { input: number; output: number; thinking?: number };
@@ -342,6 +358,12 @@ export class UsageService {
       updates.geminiFlashInputTokens = { increment: tokenUsage.geminiFlash.input };
       updates.geminiFlashOutputTokens = { increment: tokenUsage.geminiFlash.output };
       updates.geminiFlashCost = { increment: cost.totalCost };
+    }
+
+    if (tokenUsage.gemini3Flash) {
+      // Just track cost for now
+      // const cost = CostCalculator.calculateModelCost('GEMINI_3_FLASH', ...);
+      // implicitly added to totalCost passed in
     }
 
     if (tokenUsage.geminiPro) {

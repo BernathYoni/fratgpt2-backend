@@ -61,6 +61,10 @@ export class CostCalculator {
       INPUT: 10.00,  // $10.00 per 1M input tokens (Gemini 3.0 Pro)
       OUTPUT: 40.00, // $40.00 per 1M output tokens
     },
+    GEMINI_3_FLASH: {
+      INPUT: 0.50,   // $0.50 per 1M input tokens (Gemini 3 Flash Preview - Thinking)
+      OUTPUT: 3.00,  // $3.00 per 1M output tokens
+    },
     OPENAI_MINI: {
       INPUT: 0.25,   // $0.25 per 1M input tokens (GPT-5 mini)
       OUTPUT: 2.00,  // $2.00 per 1M output tokens
@@ -134,7 +138,7 @@ export class CostCalculator {
    * Calculate cost for a specific model
    */
   static calculateModelCost(
-    model: 'GEMINI_FLASH' | 'GEMINI_PRO' | 'GEMINI_EXPERT' | 'OPENAI_MINI' | 'OPENAI_PRO' | 'CLAUDE_SONNET' | 'CLAUDE_OPUS' | 'OPENAI_ADMIN',
+    model: 'GEMINI_FLASH' | 'GEMINI_PRO' | 'GEMINI_EXPERT' | 'GEMINI_3_FLASH' | 'OPENAI_MINI' | 'OPENAI_PRO' | 'CLAUDE_SONNET' | 'CLAUDE_OPUS' | 'OPENAI_ADMIN',
     tokens: TokenCosts
   ): number {
     // Fallback for old keys if necessary or just strict typing

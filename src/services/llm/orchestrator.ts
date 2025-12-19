@@ -22,6 +22,40 @@ export class LLMOrchestrator {
   }
 
   /**
+   * Dedicated method for streaming the "Thought Process" only.
+   * Uses Gemini 3 Flash Preview (via GeminiProvider.generateStream).
+   * Does NOT return the final structured answer for the DB.
+   */
+  async *streamThoughts(messages: LLMMessage[]): AsyncIterable<string | any> {
+    const startTime = Date.now();
+    console.log(`[ORCHESTRATOR] [${new Date().toISOString()}] 🧠 streamThoughts() called`);
+    
+    if (!this.gemini.generateStream) {
+      throw new Error('GeminiProvider does not support streaming.');
+    }
+
+    // Use specific options for the thinking stream
+    // Mode is irrelevant here as we hardcoded the model in gemini.ts for streaming
+    const options = {
+      maxTokens: 4096,
+      temperature: 0.7,
+      mode: 'FAST' as const, 
+    };
+
+    try {
+      for await (const chunk of this.gemini.generateStream(messages, options)) {
+        yield chunk;
+      }
+    } catch (error) {
+      console.error('[ORCHESTRATOR] ❌ Error in streamThoughts:', error);
+      yield `[ERROR] Thinking process failed: ${error}`;
+    }
+
+    const duration = Date.now() - startTime;
+    console.log(`[ORCHESTRATOR] [${new Date().toISOString()}] ✅ Thoughts stream complete in ${duration}ms`);
+  }
+
+  /**
    * Generate response based on mode
    */
   async generate(mode: ChatMode, messages: LLMMessage[]): Promise<{
