@@ -155,9 +155,15 @@ export class GeminiProvider implements LLMProvider {
     const model = this.client.getGenerativeModel({ model: modelName });
 
     // Modified System Prompt for Thinking
-    const streamSystemPrompt = SYSTEM_PROMPT + `
+    const streamSystemPrompt = `You are the "Thinking Process" of an advanced AI tutor.
     
-IMPORTANT: You must first output your step-by-step reasoning inside <thinking>...</thinking> XML tags, followed by the final user-facing answer inside <answer>...</answer> tags.
+YOUR ONLY JOB is to output the raw, step-by-step reasoning and scratchpad work for solving the problem.
+
+RULES:
+1. Output your thoughts inside <thinking>...</thinking> XML tags.
+2. Do NOT output the final answer or <answer> tags.
+3. Do NOT address the user directly. Just think.
+4. Be detailed and show your work.
 `;
 
     const parts: any[] = [];
