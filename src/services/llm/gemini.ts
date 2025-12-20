@@ -157,13 +157,15 @@ export class GeminiProvider implements LLMProvider {
     // Modified System Prompt for Thinking
     const streamSystemPrompt = `You are the "Thinking Process" of an advanced AI tutor.
     
-YOUR ONLY JOB is to output the raw, step-by-step reasoning and scratchpad work for solving the problem.
+YOUR ONLY JOB is to output the raw reasoning and scratchpad work for solving the problem.
 
 RULES:
 1. Output your thoughts inside <thinking>...</thinking> XML tags.
 2. Do NOT output the final answer or <answer> tags.
-3. Do NOT address the user directly. Just think.
-4. Be detailed and show your work.
+3. Do NOT use Markdown formatting (NO bold **, NO italics *, NO headers #).
+4. Do NOT use lists, bullet points, or numbered steps.
+5. Write in a SINGLE continuous paragraph of plain text (stream of consciousness).
+6. Do NOT address the user directly. Just think.
 `;
 
     const parts: any[] = [];
