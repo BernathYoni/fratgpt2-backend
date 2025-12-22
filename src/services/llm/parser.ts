@@ -93,6 +93,25 @@ export class ExpertParser {
   private processParsedJson(parsed: any, method: string): ParseAttempt {
     let shortAnswer: string = 'No answer';
 
+    // NEW FORMAT: finalAnswer + steps
+    if (parsed.finalAnswer) {
+      shortAnswer = String(parsed.finalAnswer);
+      
+      const steps = Array.isArray(parsed.steps) ? parsed.steps : [];
+      
+      return {
+        method,
+        success: true,
+        result: {
+          shortAnswer,
+          steps,
+          structuredAnswer: parsed // keep raw
+        },
+        timestamp: new Date()
+      };
+    }
+
+    // OLD FORMAT FALLBACKS
     if (parsed.shortAnswer || parsed.answer) {
       shortAnswer = String(parsed.shortAnswer || parsed.answer);
     } else if (parsed.content && typeof parsed.content === 'object') {
@@ -123,6 +142,7 @@ export class ExpertParser {
       shortAnswer: result.shortAnswer,
       questionType: result.questionType,
       structuredAnswer: result.structuredAnswer,
+      steps: result.steps, // Pass steps through
       confidence,
       parseMethod: method,
     };

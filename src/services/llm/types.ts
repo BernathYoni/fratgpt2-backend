@@ -46,8 +46,9 @@ export interface LLMResponse {
   error?: string;
 
   // Structured answer fields
-  questionType?: string;
+  questionType?: string; // Deprecated but kept for compatibility
   structuredAnswer?: any;
+  steps?: Array<{ title: string; content: string }>; // New field for step-by-step logic
 }
 
 export interface LLMProvider {
