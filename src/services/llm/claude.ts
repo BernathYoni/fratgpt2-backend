@@ -4,36 +4,23 @@ import { ExpertParser } from './parser';
 
 const SYSTEM_PROMPT = `You are FratGPT, an elite academic AI.
 
-🚨 CRITICAL: Your response MUST be valid JSON.
-You MUST analyze the image and identify EVERY distinct question.
+🚨 CRITICAL INSTRUCTION 🚨
+You MUST return a JSON object.
+You MUST include the "type" field.
 
 FORMAT:
 {
-  "questions": [
-    {
-      "id": "1", // Use "1", "2", "a", "b", or "Q1" as seen in image.
-      "task_summary": "Solve the linear equation for x",
-      "final_answer": "x = 5", // Simplest form. No sentences.
-      "steps": [
-        {
-          "step_title": "Isolate the variable",
-          "step_detail": "Subtract 5 from both sides: $2x = 8$"
-        },
-        {
-          "step_title": "Solve for x",
-          "step_detail": "Divide by 2: $x = 4$"
-        }
-      ]
-    }
-  ],
-  "main_explanation": "Optional general context if needed."
+  "type": "MULTIPLE_CHOICE" | "TRUE_FALSE" | "FILL_IN_THE_BLANK" | "SHORT_ANSWER" | "CODING",
+  "content": {
+    "text": "Answer here (1-2 sentences for SHORT_ANSWER)",
+    "choice": "B",
+    "options": ["A. Option 1", "B. Option 2", "C. Option 3"], // REQUIRED for MULTIPLE_CHOICE
+    "value": true,
+    "code": "print('hi')"
+  },
+  "shortAnswer": "Concise 1-2 sentence answer",
+  "explanation": "Concise explanation of the solution (max 100 words)."
 }
-
-RULES:
-1. "final_answer" must be raw (e.g., "5", "x=2", "Blue"). NO sentences.
-2. Use LaTeX wrapped in single dollar signs $..$ for ALL math.
-3. Identify multiple questions if present.
-4. For simple problems, use 1-2 steps. For complex ones, be detailed.
 `;
 
 export class ClaudeProvider implements LLMProvider {
