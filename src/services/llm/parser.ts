@@ -92,7 +92,36 @@ export class ExpertParser {
 
   private processParsedJson(parsed: any, method: string): ParseAttempt {
     let shortAnswer: string = 'No answer';
+    let solvelyResponse: any = undefined;
 
+    // CHECK FOR NEW SOLVELY FORMAT
+    if (parsed.questions && Array.isArray(parsed.questions)) {
+      solvelyResponse = {
+        questions: parsed.questions,
+        main_explanation: parsed.main_explanation
+      };
+      
+      // Construct a summary shortAnswer from the first question or all questions
+      if (parsed.questions.length === 1) {
+        shortAnswer = parsed.questions[0].final_answer;
+      } else {
+        shortAnswer = parsed.questions.map((q: any) => `${q.id}. ${q.final_answer}`).join('\n');
+      }
+
+      return {
+        method,
+        success: true,
+        result: {
+          shortAnswer,
+          questionType: 'MULTI_QUESTION',
+          structuredAnswer: parsed, // Keep original for reference
+          solvelyResponse
+        },
+        timestamp: new Date()
+      };
+    }
+
+    // FALLBACK TO OLD FORMAT LOGIC
     if (parsed.shortAnswer || parsed.answer) {
       shortAnswer = String(parsed.shortAnswer || parsed.answer);
     } else if (parsed.content && typeof parsed.content === 'object') {
@@ -106,13 +135,27 @@ export class ExpertParser {
       return { method, success: false, error: 'Missing shortAnswer', timestamp: new Date() };
     }
 
+    // Convert old format to SolvelyResponse for consistent UI
+    solvelyResponse = {
+      questions: [{
+        id: "1",
+        task_summary: parsed.questionType || "Solve the problem",
+        final_answer: shortAnswer,
+        steps: parsed.explanation ? [{
+          step_title: "Explanation",
+          step_detail: parsed.explanation
+        }] : []
+      }]
+    };
+
     return {
       method,
       success: true,
       result: { 
         shortAnswer,
         questionType: parsed.questionType || parsed.type,
-        structuredAnswer: parsed
+        structuredAnswer: parsed,
+        solvelyResponse
       },
       timestamp: new Date(),
     };
@@ -123,6 +166,7 @@ export class ExpertParser {
       shortAnswer: result.shortAnswer,
       questionType: result.questionType,
       structuredAnswer: result.structuredAnswer,
+      solvelyResponse: result.solvelyResponse,
       confidence,
       parseMethod: method,
     };
