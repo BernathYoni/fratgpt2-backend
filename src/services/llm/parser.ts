@@ -97,15 +97,28 @@ export class ExpertParser {
     if (parsed.finalAnswer) {
       shortAnswer = String(parsed.finalAnswer);
       
-      const steps = Array.isArray(parsed.steps) ? parsed.steps : [];
+      let steps = [];
+      if (Array.isArray(parsed.steps)) {
+        steps = parsed.steps.map((s: any) => ({
+          title: s.title ? String(s.title) : 'Step',
+          content: s.content ? String(s.content) : String(s)
+        }));
+      }
       
+      // Ensure structuredAnswer contains the clean data
+      const structuredAnswer = {
+        finalAnswer: shortAnswer,
+        steps,
+        ...parsed // keep other raw fields just in case
+      };
+
       return {
         method,
         success: true,
         result: {
           shortAnswer,
           steps,
-          structuredAnswer: parsed // keep raw
+          structuredAnswer
         },
         timestamp: new Date()
       };
