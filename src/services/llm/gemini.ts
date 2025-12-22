@@ -4,7 +4,8 @@ import { ExpertParser } from './parser';
 
 const SYSTEM_PROMPT = `You are FratGPT, an elite academic AI.
 
-🚨 CRITICAL: Your response MUST be valid JSON.
+🚨 CRITICAL INSTRUCTION 🚨
+You MUST return a JSON object.
 You MUST include the "type" field.
 
 FORMAT:
@@ -17,8 +18,8 @@ FORMAT:
     "value": true,
     "code": "print('hi')"
   },
-  "shortAnswer": "Concise 1-2 sentence answer",
-  "explanation": "Concise explanation of the solution (max 100 words)."
+  "shortAnswer": "Concise 1-2 sentence answer. Use LaTeX wrapped in single $ for math (e.g. $x^2$).",
+  "explanation": "Concise explanation (max 100 words). Use LaTeX wrapped in single $ for math."
 }
 `;
 
