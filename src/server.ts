@@ -81,6 +81,7 @@ async function start() {
 
     await server.listen({ port, host });
     console.log(`🚀 Server running on ${host}:${port}`);
+    console.log(`✨ Solvely-style Step-by-Step logic enabled v2.2`);
   } catch (err) {
     server.log.error(err);
     process.exit(1);
