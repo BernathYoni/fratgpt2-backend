@@ -141,6 +141,7 @@ export class ClaudeProvider implements LLMProvider {
         totalTokens,
       };
       parsed.tokensUsed = totalTokens;
+      parsed.model = model; // Track specific model version
 
       const totalDuration = Date.now() - startTime;
       console.log(`[CLAUDE] [${new Date().toISOString()}] [${requestId}] ✅ Total generation time: ${totalDuration}ms`);

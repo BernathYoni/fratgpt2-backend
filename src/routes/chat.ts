@@ -182,14 +182,12 @@ export async function chatRoutes(server: FastifyInstance) {
             data: {
               chatSessionId: session.id,
               role: 'ASSISTANT',
-              content: provider.response.shortAnswer || 'No answer',
-              shortAnswer: provider.response.shortAnswer,
-              provider: provider.provider.toUpperCase() as any,
-              metadata: { 
-                ...(provider.error ? { error: provider.error } : {}), 
-                tokenUsage: provider.response.tokenUsage as any
-              },
-              questionType,
+                            content: provider.response.shortAnswer || 'No answer',
+                            shortAnswer: provider.response.shortAnswer,
+                            provider: provider.provider.toUpperCase() as any,
+                            model: provider.response.model, // Save exact model
+                            metadata: { ...(provider.error ? { error: provider.error } : {}), tokenUsage: provider.response.tokenUsage as any },
+                            questionType,
               answerFormat,
               structuredAnswer: structuredAnswer as any,
               confidence,
@@ -411,6 +409,7 @@ export async function chatRoutes(server: FastifyInstance) {
               content: provider.response.shortAnswer || 'No answer',
               shortAnswer: provider.response.shortAnswer,
               provider: provider.provider.toUpperCase() as any,
+              model: provider.response.model, // Save exact model
               metadata: { 
                 ...(provider.error ? { error: provider.error } : {}), 
                 tokenUsage: provider.response.tokenUsage as any,
@@ -431,6 +430,7 @@ export async function chatRoutes(server: FastifyInstance) {
             role: 'ASSISTANT',
             content: result.primary.shortAnswer || 'No answer',
             shortAnswer: result.primary.shortAnswer,
+            model: result.primary.model, // Save exact model
             metadata: { 
               tokenUsage: result.primary.tokenUsage as any,
               ...(thinkingUsage ? { thinkingUsage } : {})
@@ -603,6 +603,7 @@ export async function chatRoutes(server: FastifyInstance) {
               content: provider.response.shortAnswer || 'No answer',
               shortAnswer: provider.response.shortAnswer,
               provider: provider.provider.toUpperCase() as any,
+              model: provider.response.model, // Save exact model version
               metadata: { ...(provider.error ? { error: provider.error } : {}), tokenUsage: provider.response.tokenUsage as any },
               questionType,
               answerFormat,
@@ -625,8 +626,10 @@ export async function chatRoutes(server: FastifyInstance) {
             role: 'ASSISTANT',
             content: result.primary.shortAnswer || 'No answer',
             shortAnswer: result.primary.shortAnswer,
+            model: result.primary.model, // Save exact model
             metadata: { tokenUsage: result.primary.tokenUsage as any },
             provider: 'GEMINI',
+            model: result.primary.model, // Save exact model version
             questionType,
             answerFormat,
             structuredAnswer: structuredAnswer as any,

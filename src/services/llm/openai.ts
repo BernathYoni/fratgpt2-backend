@@ -132,6 +132,8 @@ export class OpenAIProvider implements LLMProvider {
       parsed.tokensUsed = parsed.tokenUsage.totalTokens;
     }
 
+    parsed.model = model; // Track specific model version
+
     const totalDuration = Date.now() - startTime;
     console.log(`[OPENAI] [${new Date().toISOString()}] [${requestId}] ✅ Total generation time: ${totalDuration}ms`);
 

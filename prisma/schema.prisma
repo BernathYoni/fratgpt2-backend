@@ -155,6 +155,7 @@ model Message {
   content          String       @db.Text
   shortAnswer      String?
   provider         LLMProvider?
+  model            String?      // e.g. "gpt-5.2", "gemini-3-flash-preview"
   metadata         Json?
   createdAt        DateTime     @default(now())
 

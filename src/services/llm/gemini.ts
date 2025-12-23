@@ -154,6 +154,8 @@ export class GeminiProvider implements LLMProvider {
       parsed.tokensUsed = parsed.tokenUsage.totalTokens;
     }
 
+    parsed.model = modelName; // Track specific model version
+
     const totalDuration = Date.now() - startTime;
     console.log(`[GEMINI] [${new Date().toISOString()}] [${requestId}] ✅ Total generation time: ${totalDuration}ms`);
 
