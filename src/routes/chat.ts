@@ -400,7 +400,7 @@ export async function chatRoutes(server: FastifyInstance) {
       let regionData = null; // Legacy placeholder
 
       // Save Assistant Messages
-      if ((mode === 'EXPERT' || mode === 'REGULAR') && result.providers) {
+      if (mode === 'EXPERT' && result.providers) {
         for (const provider of result.providers) {
            await prisma.message.create({
             data: {
@@ -459,7 +459,7 @@ export async function chatRoutes(server: FastifyInstance) {
         // Add Chat Usage
         if (mode === 'FAST' && result.primary?.tokenUsage) {
             tokenUsage.geminiFlash = { input: result.primary.tokenUsage.inputTokens, output: result.primary.tokenUsage.outputTokens };
-        } else if ((mode === 'REGULAR' || mode === 'EXPERT') && result.providers) {
+        } else if (mode === 'EXPERT' && result.providers) {
              for (const provider of result.providers) {
                 if (provider.response.tokenUsage) {
                   const tokens = provider.response.tokenUsage;
@@ -587,7 +587,7 @@ export async function chatRoutes(server: FastifyInstance) {
       const result = await orchestrator.generate(effectiveMode as ChatMode, llmMessages);
 
       // Save response(s) with structured answer data
-      if ((effectiveMode === 'EXPERT' || effectiveMode === 'REGULAR') && result.providers) {
+      if (effectiveMode === 'EXPERT' && result.providers) {
         // Save all provider responses (no consensus)
         for (const provider of result.providers) {
           // Use structured answer from response
@@ -626,10 +626,9 @@ export async function chatRoutes(server: FastifyInstance) {
             role: 'ASSISTANT',
             content: result.primary.shortAnswer || 'No answer',
             shortAnswer: result.primary.shortAnswer,
-            model: result.primary.model, // Save exact model
+            model: result.primary.model, // Save exact model version
             metadata: { tokenUsage: result.primary.tokenUsage as any },
             provider: 'GEMINI',
-            model: result.primary.model, // Save exact model version
             questionType,
             answerFormat,
             structuredAnswer: structuredAnswer as any,

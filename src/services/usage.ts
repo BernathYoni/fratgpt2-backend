@@ -167,7 +167,7 @@ export class UsageService {
     let totalCost = 0;
     const updates: any = {
       solvesUsed: { increment: 1 },
-      modeRegularCount: mode === 'REGULAR' ? { increment: 1 } : undefined,
+      modeRegularCount: (mode as string) === 'REGULAR' ? { increment: 1 } : undefined,
       modeFastCount: mode === 'FAST' ? { increment: 1 } : undefined,
       modeExpertCount: mode === 'EXPERT' ? { increment: 1 } : undefined,
     };
@@ -291,7 +291,7 @@ export class UsageService {
         userId,
         date: today,
         solvesUsed: 1,
-        modeRegularCount: mode === 'REGULAR' ? 1 : 0,
+        modeRegularCount: (mode as string) === 'REGULAR' ? 1 : 0,
         modeFastCount: mode === 'FAST' ? 1 : 0,
         modeExpertCount: mode === 'EXPERT' ? 1 : 0,
         tokensUsed: updates.tokensUsed?.increment || 0,

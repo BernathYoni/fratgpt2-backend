@@ -106,35 +106,35 @@ export async function adminRoutes(server: FastifyInstance) {
            else if (modelName.includes('claude-opus')) costKey = 'CLAUDE_OPUS';
            else if (modelName.includes('claude')) costKey = 'CLAUDE_SONNET';
         } else {
-            // Legacy Fallback Logic
-            if (msg.provider === 'GEMINI') {
-              if (mode === 'FAST') {
-                modelName = 'Gemini 3 Flash Preview'; // Assuming update happened
-                costKey = 'GEMINI_3_FLASH';
-              } else if (mode === 'REGULAR') {
-                modelName = 'Gemini 2.5 Pro (Legacy)';
-                costKey = 'GEMINI_PRO';
-              } else { // EXPERT
-                modelName = 'Gemini 3.0 Pro';
-                costKey = 'GEMINI_EXPERT';
-              }
-            } else if (msg.provider === 'OPENAI') {
-              if (mode === 'REGULAR') {
-                modelName = 'GPT-5 Mini (Legacy)';
-                costKey = 'OPENAI_MINI';
-              } else { // EXPERT
-                modelName = 'GPT-5.2';
-                costKey = 'OPENAI_PRO';
-              }
-            } else if (msg.provider === 'CLAUDE') {
-              if (mode === 'EXPERT') {
-                modelName = 'Claude Opus 4.5';
-                costKey = 'CLAUDE_OPUS';
-              } else {
-                modelName = 'Claude Sonnet 4.5 (Legacy)';
-                costKey = 'CLAUDE_SONNET';
-              }
-            }
+        // Determine Model Name and Cost Key based on Mode + Provider
+        if (msg.provider === 'GEMINI') {
+          if (mode === 'FAST') {
+            modelName = 'Gemini 3 Flash Preview';
+            costKey = 'GEMINI_3_FLASH';
+          } else if ((mode as string) === 'REGULAR') { // Legacy support
+            modelName = 'Gemini 2.5 Pro (Legacy)';
+            costKey = 'GEMINI_PRO';
+          } else { // EXPERT
+            modelName = 'Gemini 3.0 Pro';
+            costKey = 'GEMINI_EXPERT';
+          }
+        } else if (msg.provider === 'OPENAI') {
+          if ((mode as string) === 'REGULAR') { // Legacy support
+            modelName = 'GPT-5 Mini (Legacy)';
+            costKey = 'OPENAI_MINI';
+          } else { // EXPERT
+            modelName = 'GPT-5.2';
+            costKey = 'OPENAI_PRO';
+          }
+        } else if (msg.provider === 'CLAUDE') {
+          if (mode === 'EXPERT') {
+            modelName = 'Claude Opus 4.5';
+            costKey = 'CLAUDE_OPUS';
+          } else { // Legacy REGULAR or default
+            modelName = 'Claude Sonnet 4.5 (Legacy)';
+            costKey = 'CLAUDE_SONNET';
+          }
+        }
         }
 
         // Calculate Cost
@@ -644,13 +644,13 @@ const resetStatsSchema = z.object({
              if (r.provider === 'GEMINI') {
                 if (msg.chatSession.mode === 'FAST') {
                   modelKey = 'GEMINI_FLASH';
-                } else if (msg.chatSession.mode === 'REGULAR') {
+                } else if ((msg.chatSession.mode as string) === 'REGULAR') {
                   modelKey = 'GEMINI_PRO';
                 } else {
                   modelKey = 'GEMINI_EXPERT';
                 }
              } else if (r.provider === 'OPENAI') {
-                modelKey = msg.chatSession.mode === 'REGULAR' ? 'OPENAI_MINI' : 'OPENAI_PRO';
+                modelKey = (msg.chatSession.mode as string) === 'REGULAR' ? 'OPENAI_MINI' : 'OPENAI_PRO';
              } else if (r.provider === 'CLAUDE') {
                 modelKey = msg.chatSession.mode === 'EXPERT' ? 'CLAUDE_OPUS' : 'CLAUDE_SONNET';
              }
@@ -813,10 +813,10 @@ const resetStatsSchema = z.object({
              let costKey = 'GEMINI_PRO';
              if (r.provider === 'GEMINI') {
                 if (mode === 'FAST') costKey = 'GEMINI_FLASH';
-                else if (mode === 'REGULAR') costKey = 'GEMINI_PRO';
+                else if ((mode as string) === 'REGULAR') costKey = 'GEMINI_PRO';
                 else costKey = 'GEMINI_EXPERT';
              } else if (r.provider === 'OPENAI') {
-                costKey = mode === 'REGULAR' ? 'OPENAI_MINI' : 'OPENAI_PRO';
+                costKey = (mode as string) === 'REGULAR' ? 'OPENAI_MINI' : 'OPENAI_PRO';
              } else if (r.provider === 'CLAUDE') {
                 costKey = mode === 'EXPERT' ? 'CLAUDE_OPUS' : 'CLAUDE_SONNET';
              }

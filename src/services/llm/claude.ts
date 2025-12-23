@@ -14,9 +14,9 @@ FORMAT:
       "title": "Step 1 Title (e.g., 'Isolate x')",
       "content": "Explanation. Use LaTeX $...$ for math.",
       "visual": {
-        "type": "graph" | "diagram",
-        "data": "Equation OR Mermaid code",
-        "caption": "Brief description"
+        "type": "graph",
+        "data": "x^2",
+        "caption": "The parabola y = x^2"
       }
     }
   ]
@@ -25,18 +25,16 @@ FORMAT:
 RULES:
 1. **finalAnswer**: Must be the RAW value required for the answer box. NO "The answer is...".
 2. **Steps Tone**: Use a COMMANDING, DECLARATIVE tone (e.g., "Divide by 2." NOT "We can divide..."). Be concise.
-4. **VISUALIZATION RULE:** If a math graph would SIGNIFICANTLY help the user understand the concept, include a "visual" object in the step.
+3. **VISUALIZATION RULE:** If a math graph would SIGNIFICANTLY help the user understand the concept, include a "visual" object in the step.
    - For **Graphs** (Calculus/Algebra): Use "type": "graph".
    - **CRITICAL:** "data" MUST be the raw mathematical equation string ONLY (e.g., "x^2", "sin(x)", "x^3 - 3x").
    - DO NOT include text, descriptions, or explanations in the "data" field. Use "caption" for text.
    - Do NOT force a visual if the text explanation is sufficient. Use judgment.
-5. **Math formatting**:
+4. **Math formatting**:
    - Use LaTeX ($...$) ONLY for complex equations or expressions that require formatting (e.g., fractions, integrals, powers).
    - Use PLAIN TEXT for simple numbers, single variables, and basic arithmetic (e.g., use "x = 5", "y", "slope", NOT "$x=5$", "$y$").
    - Goal: Readability. Do not over-format.
-6. Do NOT use Markdown formatting outside of the JSON structure.
-`;
-4. **Safety**:
+5. Do NOT use Markdown formatting outside of the JSON structure.
 `;
 
 export class ClaudeProvider implements LLMProvider {
@@ -52,8 +50,8 @@ export class ClaudeProvider implements LLMProvider {
     const requestId = options?.requestId || 'SINGLE';
 
     // Select model based on mode:
-    // REGULAR: Claude Sonnet 4.5
     // EXPERT: Claude Opus 4.5
+    // Default: Claude Sonnet 4.5
     let model: string;
     if (options?.mode === 'EXPERT') {
       model = 'claude-opus-4-5-20251101';
@@ -74,79 +72,79 @@ export class ClaudeProvider implements LLMProvider {
       }
 
       try {
-      const claudeMessages: Anthropic.MessageParam[] = [];
+        const claudeMessages: Anthropic.MessageParam[] = [];
 
-      for (const msg of messages) {
-        const content: any[] = [];
+        for (const msg of messages) {
+          const content: any[] = [];
 
-        if (msg.imageData) {
+          if (msg.imageData) {
+            content.push({
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: 'image/png',
+                data: msg.imageData.replace(/^data:image\/\w+;base64,/, ''),
+              },
+            });
+          }
+
           content.push({
-            type: 'image',
-            source: {
-              type: 'base64',
-              media_type: 'image/png',
-              data: msg.imageData.replace(/^data:image\/\w+;base64,/, ''),
-            },
+            type: 'text',
+            text: msg.content,
+          });
+
+          claudeMessages.push({
+            role: msg.role === 'user' ? 'user' : 'assistant',
+            content,
           });
         }
 
-        content.push({
-          type: 'text',
-          text: msg.content,
+        const apiStart = Date.now();
+        console.log(`[CLAUDE] [${new Date().toISOString()}] [${requestId}] 📤 Sending request to Anthropic API...`);
+        
+        const response = await this.client.messages.create({
+          model,
+          max_tokens: options?.maxTokens || 2048,
+          temperature: options?.temperature || 0.7,
+          system: SYSTEM_PROMPT,
+          messages: claudeMessages,
+        });
+        const apiDuration = Date.now() - apiStart;
+
+        console.log(`[CLAUDE] [${new Date().toISOString()}] [${requestId}] 📥 Received response from Anthropic API in ${apiDuration}ms`);
+
+        const textBlocks = response.content.filter((block: any) => block.type === 'text');
+        const text = textBlocks.map((block: any) => block.text).join('\n');
+
+        console.log('[CLAUDE] 📝 RAW RESPONSE TEXT:');
+        console.log(text);
+
+        const parseStart = Date.now();
+        const parser = new ExpertParser({
+          enableSelfHealing: false,
+          fallbackToPartial: true,
+          strictValidation: false,
+          logAllAttempts: true,
         });
 
-        claudeMessages.push({
-          role: msg.role === 'user' ? 'user' : 'assistant',
-          content,
-        });
-      }
+        const parsed = await parser.parse(text, 'claude');
+        
+        const inputTokens = response.usage.input_tokens || 0;
+        const outputTokens = response.usage.output_tokens || 0;
+        const totalTokens = inputTokens + outputTokens;
 
-      const apiStart = Date.now();
-      console.log(`[CLAUDE] [${new Date().toISOString()}] [${requestId}] 📤 Sending request to Anthropic API...`);
-      
-      const response = await this.client.messages.create({
-        model,
-        max_tokens: options?.maxTokens || 2048,
-        temperature: options?.temperature || 0.7,
-        system: SYSTEM_PROMPT,
-        messages: claudeMessages,
-      });
-      const apiDuration = Date.now() - apiStart;
+        parsed.tokenUsage = {
+          inputTokens,
+          outputTokens,
+          totalTokens,
+        };
+        parsed.tokensUsed = totalTokens;
+        parsed.model = model; // Track specific model version
 
-      console.log(`[CLAUDE] [${new Date().toISOString()}] [${requestId}] 📥 Received response from Anthropic API in ${apiDuration}ms`);
+        const totalDuration = Date.now() - startTime;
+        console.log(`[CLAUDE] [${new Date().toISOString()}] [${requestId}] ✅ Total generation time: ${totalDuration}ms`);
 
-      const textBlocks = response.content.filter((block: any) => block.type === 'text');
-      const text = textBlocks.map((block: any) => block.text).join('\n');
-
-      console.log('[CLAUDE] 📝 RAW RESPONSE TEXT:');
-      console.log(text);
-
-      const parseStart = Date.now();
-      const parser = new ExpertParser({
-        enableSelfHealing: false,
-        fallbackToPartial: true,
-        strictValidation: false,
-        logAllAttempts: true,
-      });
-
-      const parsed = await parser.parse(text, 'claude');
-      
-      const inputTokens = response.usage.input_tokens || 0;
-      const outputTokens = response.usage.output_tokens || 0;
-      const totalTokens = inputTokens + outputTokens;
-
-      parsed.tokenUsage = {
-        inputTokens,
-        outputTokens,
-        totalTokens,
-      };
-      parsed.tokensUsed = totalTokens;
-      parsed.model = model; // Track specific model version
-
-      const totalDuration = Date.now() - startTime;
-      console.log(`[CLAUDE] [${new Date().toISOString()}] [${requestId}] ✅ Total generation time: ${totalDuration}ms`);
-
-      return parsed;
+        return parsed;
       } catch (error: any) {
         lastError = error;
         const isOverloaded = error?.status === 529 || error?.message?.includes('overloaded');
