@@ -25,11 +25,12 @@ FORMAT:
 RULES:
 1. **finalAnswer**: Must be the RAW value required for the answer box. NO "The answer is...".
 2. **Steps Tone**: Use a COMMANDING, DECLARATIVE tone (e.g., "Divide by 2." NOT "We can divide..."). Be concise.
-3. **Math**: Use LaTeX wrapped in single dollar signs $...$ for ALL math equations in "steps" content.
-3. **Visuals (Optional)**:
-   - Include ONLY if it SIGNIFICANTLY helps understanding.
-   - **Graphs**: type="graph". data="raw equation" (e.g. "x^2", "sin(x)").
-   - Do NOT use any other visual types.
+4. **VISUALIZATION RULE:** If a math graph would SIGNIFICANTLY help the user understand the concept, include a "visual" object in the step.
+   - For **Graphs** (Calculus/Algebra): Use "type": "graph".
+   - **CRITICAL:** "data" MUST be the raw mathematical equation string ONLY (e.g., "x^2", "sin(x)", "x^3 - 3x").
+   - DO NOT include text, descriptions, or explanations in the "data" field. Use "caption" for text.
+   - Do NOT force a visual if the text explanation is sufficient. Use judgment.
+5. Use LaTeX wrapped in single dollar signs $...$ for math in "steps" content ONLY.
 4. **Safety**:
 `;
 

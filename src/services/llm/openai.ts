@@ -27,7 +27,9 @@ RULES:
 2. "steps" should contain as many steps as needed to explain the solution clearly.
 3. The "content" of each step MUST use a commanding, declarative tone.
 4. **VISUALIZATION RULE:** If a math graph would SIGNIFICANTLY help the user understand the concept, include a "visual" object in the step.
-   - For **Graphs** (Calculus/Algebra): Use "type": "graph" and put the raw equation in "data" (e.g., "sin(x)", "x^2 + 2x").
+   - For **Graphs** (Calculus/Algebra): Use "type": "graph".
+   - **CRITICAL:** "data" MUST be the raw mathematical equation string ONLY (e.g., "x^2", "sin(x)", "x^3 - 3x").
+   - DO NOT include text, descriptions, or explanations in the "data" field. Use "caption" for text.
    - Do NOT force a visual if the text explanation is sufficient. Use judgment.
 5. Use LaTeX wrapped in single dollar signs $...$ for math in "steps" content ONLY.
 6. Do NOT use Markdown formatting outside of the JSON structure.
