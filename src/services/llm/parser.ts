@@ -101,7 +101,12 @@ export class ExpertParser {
       if (Array.isArray(parsed.steps)) {
         steps = parsed.steps.map((s: any) => ({
           title: s.title ? String(s.title) : 'Step',
-          content: s.content ? String(s.content) : String(s)
+          content: s.content ? String(s.content) : String(s),
+          visual: s.visual ? {
+            type: s.visual.type,
+            data: s.visual.data,
+            caption: s.visual.caption
+          } : undefined
         }));
       }
       

@@ -11,12 +11,13 @@ FORMAT:
   "finalAnswer": "The EXACT value to input into an online homework system (e.g., '7.5', 'x=5', 'B'). Plain text only. NO conversational text. NO LaTeX.",
   "steps": [
     {
-      "title": "Step 1 Title (e.g., 'Isolate x')",
-      "content": "Explanation of how to perform this step. Use LaTeX $...$ for math."
-    },
-    {
-      "title": "Step 2 Title",
-      "content": "..."
+      "title": "Step 1 Title (e.g., 'Plot the function')",
+      "content": "Explanation... Use LaTeX $...$ for math.",
+      "visual": {
+        "type": "graph", 
+        "data": "x^2",
+        "caption": "The parabola y = x^2"
+      }
     }
   ]
 }
@@ -24,9 +25,13 @@ FORMAT:
 RULES:
 1. "finalAnswer" must be the EXACT, RAW value required for the homework answer field. NO conversational padding.
 2. "steps" should contain as many steps as needed to explain the solution clearly.
-3. The "content" of each step MUST use a commanding, declarative tone (e.g., "Divide both sides by 2." instead of "Now we should divide both sides by 2."). Be direct and concise.
-4. Use LaTeX wrapped in single dollar signs $...$ for math in "steps" content ONLY.
-5. Do NOT use Markdown formatting outside of the JSON structure.
+3. The "content" of each step MUST use a commanding, declarative tone.
+4. **VISUALIZATION RULE:** If a visual aid (Graph or Diagram) would SIGNIFICANTLY help the user understand the concept, include a "visual" object in the step.
+   - For **Graphs** (Calculus/Algebra): Use "type": "graph" and put the raw equation in "data" (e.g., "sin(x)", "x^2 + 2x").
+   - For **Flowcharts/Processes** (CS/Logic): Use "type": "diagram" and put valid Mermaid.js code in "data" (e.g., "graph TD; A-->B;").
+   - Do NOT force a visual if the text explanation is sufficient. Use judgment.
+5. Use LaTeX wrapped in single dollar signs $...$ for math in "steps" content ONLY.
+6. Do NOT use Markdown formatting outside of the JSON structure.
 `;
 
 export class GeminiProvider implements LLMProvider {
