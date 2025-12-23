@@ -26,13 +26,11 @@ RULES:
 1. **finalAnswer**: Must be the RAW value required for the answer box. NO "The answer is...".
 2. **Steps Tone**: Use a COMMANDING, DECLARATIVE tone (e.g., "Divide by 2." NOT "We can divide..."). Be concise.
 3. **Math**: Use LaTeX wrapped in single dollar signs $...$ for ALL math equations in "steps" content.
-4. **Visuals (Optional)**: Include ONLY if it SIGNIFICANTLY helps understanding.
-   - **Graphs**: "type": "graph", "data": raw equation (e.g., "x^2", "sin(x)").
-   - **Diagrams**: "type": "diagram", "data": valid Mermaid code.
-     - Start with "graph TD" or "sequenceDiagram".
-     - Use alphanumeric Node IDs ONLY (e.g., A, B, Node1).
-     - NO special characters in Node IDs. Put labels in brackets: A[Label].
-5. **Formatting**: NO Markdown formatting outside of the JSON structure.
+3. **Visuals (Optional)**:
+   - Include ONLY if it SIGNIFICANTLY helps understanding.
+   - **Graphs**: type="graph". data="raw equation" (e.g. "x^2", "sin(x)").
+   - Do NOT use any other visual types.
+4. **Safety**:
 `;
 
 export class ClaudeProvider implements LLMProvider {
