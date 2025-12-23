@@ -51,7 +51,7 @@ export class OpenAIProvider implements LLMProvider {
     const requestId = options?.requestId || 'SINGLE';
     let model: string;
     if (options?.mode === 'EXPERT') {
-      model = 'gpt-5.1';
+      model = 'gpt-5.2'; // Updated to GPT-5.2
     } else if (options?.mode === 'REGULAR') {
       model = 'gpt-5-mini';
     } else {

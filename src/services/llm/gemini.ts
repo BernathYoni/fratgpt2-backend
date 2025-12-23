@@ -55,7 +55,7 @@ export class GeminiProvider implements LLMProvider {
     // EXPERT: Gemini 3.0 Pro (gemini-3-pro-preview via v1beta API)
     let modelName: string;
     if (options?.mode === 'FAST') {
-      modelName = 'gemini-2.0-flash-001';
+      modelName = 'gemini-3-flash-preview'; // Updated to 3.0 Flash Preview
     } else if (options?.mode === 'EXPERT') {
       modelName = 'gemini-3-pro-preview'; // Gemini 3.0 Pro preview (requires v1beta API)
     } else {
