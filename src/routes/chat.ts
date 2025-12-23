@@ -13,7 +13,7 @@ const orchestrator = new LLMOrchestrator();
 const regionService = new RegionDetectionService(process.env.GEMINI_API_KEY || '');
 
 const startChatSchema = z.object({
-  mode: z.enum(['REGULAR', 'FAST', 'EXPERT']),
+  mode: z.enum(['FAST', 'EXPERT']),
   message: z.string().min(1),
   imageData: z.string().optional(), // base64
   captureSource: z.enum(['SCREEN', 'SNIP']).optional(),
@@ -24,7 +24,7 @@ const sendMessageSchema = z.object({
   message: z.string().min(1),
   imageData: z.string().optional(),
   captureSource: z.enum(['SCREEN', 'SNIP']).optional(),
-  mode: z.enum(['REGULAR', 'FAST', 'EXPERT']).optional(), // Allow mode switching for new captures
+  mode: z.enum(['FAST', 'EXPERT']).optional(), // Allow mode switching for new captures
 });
 
 const interactionSchema = z.object({
@@ -165,17 +165,7 @@ export async function chatRoutes(server: FastifyInstance) {
       const saveStart = Date.now();
       console.log(`[CHAT/START] [${new Date().toISOString()}] 💾 Saving assistant message(s)...`);
       console.log(`[CHAT/START] 🔍 DEBUG: mode = "${mode}"`);
-      console.log(`[CHAT/START] 🔍 DEBUG: result.providers exists = ${!!result.providers}`);
-      console.log(`[CHAT/START] 🔍 DEBUG: result.providers count = ${result.providers?.length || 0}`);
-      console.log(`[CHAT/START] 🔍 DEBUG: Will save multi-provider = ${(mode === 'EXPERT' || mode === 'REGULAR') && !!result.providers}`);
-      if (result.providers) {
-        console.log(`[CHAT/START] 🔍 DEBUG: Provider list:`, result.providers.map(p => ({
-          provider: p.provider,
-          hasResponse: !!p.response,
-          shortAnswer: p.response?.shortAnswer?.substring(0, 50),
-        })));
-      }
-      if ((mode === 'EXPERT' || mode === 'REGULAR') && result.providers) {
+      if (mode === 'EXPERT' && result.providers) {
         // Save all provider responses (no consensus)
         console.log(`[CHAT/START] 💾 Entering EXPERT/multi-provider save block - saving ${result.providers.length} messages`);
         for (const provider of result.providers) {
@@ -256,14 +246,14 @@ export async function chatRoutes(server: FastifyInstance) {
         // Extract token usage from LLM response(s)
         const tokenUsage: any = {};
 
-        if ((mode === 'EXPERT' || mode === 'REGULAR') && result.providers) {
-          // Expert and Regular modes - both use 3 providers now
+        if (mode === 'EXPERT' && result.providers) {
+          // Expert mode - uses 3 providers
           for (const provider of result.providers) {
             if (provider.response.tokenUsage) {
               const tokens = provider.response.tokenUsage;
 
               if (provider.provider === 'gemini') {
-                // Gemini Pro for Regular, Gemini Exp 1206 for Expert
+                // Gemini Exp 1206 for Expert
                 tokenUsage.geminiPro = {
                   input: tokens.inputTokens,
                   output: tokens.outputTokens,
@@ -274,20 +264,12 @@ export async function chatRoutes(server: FastifyInstance) {
                   output: tokens.outputTokens,
                 };
               } else if (provider.provider === 'claude') {
-                // REGULAR mode uses Sonnet, EXPERT mode uses Opus
-                if (mode === 'EXPERT') {
-                  tokenUsage.claudeOpus = {
-                    input: tokens.inputTokens,
-                    output: tokens.outputTokens,
-                    thinking: tokens.thinkingTokens || 0,
-                  };
-                } else {
-                  tokenUsage.claudeSonnet = {
-                    input: tokens.inputTokens,
-                    output: tokens.outputTokens,
-                    thinking: tokens.thinkingTokens || 0,
-                  };
-                }
+                // EXPERT mode uses Opus
+                tokenUsage.claudeOpus = {
+                  input: tokens.inputTokens,
+                  output: tokens.outputTokens,
+                  thinking: tokens.thinkingTokens || 0,
+                };
               }
             }
           }
