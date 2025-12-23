@@ -28,7 +28,10 @@ RULES:
 3. The "content" of each step MUST use a commanding, declarative tone.
 4. **VISUALIZATION RULE:** If a visual aid (Graph or Diagram) would SIGNIFICANTLY help the user understand the concept, include a "visual" object in the step.
    - For **Graphs** (Calculus/Algebra): Use "type": "graph" and put the raw equation in "data" (e.g., "sin(x)", "x^2 + 2x").
-   - For **Flowcharts/Processes** (CS/Logic): Use "type": "diagram" and put valid Mermaid.js code in "data" (e.g., "graph TD; A-->B;").
+   - For **Flowcharts/Processes** (CS/Logic): Use "type": "diagram" and put valid Mermaid.js code in "data".
+     - STRICT SYNTAX RULE: Start with "graph TD" or "sequenceDiagram". Do NOT use "flowchart TD".
+     - Keep labels simple (avoid special characters like parentheses or brackets in node IDs).
+     - Example: "graph TD; A[Start] --> B{Decision}; B -- Yes --> C[Result 1]; B -- No --> D[Result 2];"
    - Do NOT force a visual if the text explanation is sufficient. Use judgment.
 5. Use LaTeX wrapped in single dollar signs $...$ for math in "steps" content ONLY.
 6. Do NOT use Markdown formatting outside of the JSON structure.
