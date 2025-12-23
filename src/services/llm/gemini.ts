@@ -24,8 +24,9 @@ FORMAT:
 RULES:
 1. "finalAnswer" must be the EXACT, RAW value required for the homework answer field. NO conversational padding.
 2. "steps" should contain as many steps as needed to explain the solution clearly.
-3. Use LaTeX wrapped in single dollar signs $...$ for math in "steps" content ONLY.
-4. Do NOT use Markdown formatting outside of the JSON structure.
+3. The "content" of each step MUST use a commanding, declarative tone (e.g., "Divide both sides by 2." instead of "Now we should divide both sides by 2."). Be direct and concise.
+4. Use LaTeX wrapped in single dollar signs $...$ for math in "steps" content ONLY.
+5. Do NOT use Markdown formatting outside of the JSON structure.
 `;
 
 export class GeminiProvider implements LLMProvider {
