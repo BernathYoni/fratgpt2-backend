@@ -68,7 +68,12 @@ export class ExpertParser {
 
   private attemptPartialExtraction(text: string): ParseAttempt {
     let shortAnswer: string | undefined;
-    const shortAnswerPatterns = [/"shortAnswer"\s*:\s*"([^"]*)"/, /"answer"\s*:\s*"([^"]*)"/];
+    // Added "finalAnswer" to regex patterns to support new format self-healing
+    const shortAnswerPatterns = [
+      /"finalAnswer"\s*:\s*"([^"]*)"/, 
+      /"shortAnswer"\s*:\s*"([^"]*)"/, 
+      /"answer"\s*:\s*"([^"]*)"/
+    ];
     
     for (const pattern of shortAnswerPatterns) {
       const match = text.match(pattern);
