@@ -30,7 +30,12 @@ RULES:
    - **CRITICAL:** "data" MUST be the raw mathematical equation string ONLY (e.g., "x^2", "sin(x)", "x^3 - 3x").
    - DO NOT include text, descriptions, or explanations in the "data" field. Use "caption" for text.
    - Do NOT force a visual if the text explanation is sufficient. Use judgment.
-5. Use LaTeX wrapped in single dollar signs $...$ for math in "steps" content ONLY.
+5. **Math formatting**:
+   - Use LaTeX ($...$) ONLY for complex equations or expressions that require formatting (e.g., fractions, integrals, powers).
+   - Use PLAIN TEXT for simple numbers, single variables, and basic arithmetic (e.g., use "x = 5", "y", "slope", NOT "$x=5$", "$y$").
+   - Goal: Readability. Do not over-format.
+6. Do NOT use Markdown formatting outside of the JSON structure.
+`;
 4. **Safety**:
 `;
 
