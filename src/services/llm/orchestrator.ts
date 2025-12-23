@@ -129,7 +129,7 @@ export class LLMOrchestrator {
 
     // Call all providers in parallel with Regular-mode models
     const regularOptions = {
-      maxTokens: 4096,
+      maxTokens: 16384, // Increased from 4096 to handle heavy "thinking" usage
       temperature: 0.7,
       requestId,
       mode: 'REGULAR' as const, // Gemini 2.5 Pro, GPT-4 Turbo, Claude Sonnet 4.5
@@ -224,7 +224,7 @@ export class LLMOrchestrator {
 
     // Call all providers in parallel with increased token limits to handle thinking tokens
     const expertOptions = {
-      maxTokens: 4096,
+      maxTokens: 16384, // Increased from 4096 to handle heavy "thinking" usage
       temperature: 0.7,
       requestId, // Pass request ID to providers
       mode: 'EXPERT' as const, // Use Pro models for expert mode
