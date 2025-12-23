@@ -97,29 +97,29 @@ export async function adminRoutes(server: FastifyInstance) {
         // Determine Model Name and Cost Key based on Mode + Provider
         if (msg.provider === 'GEMINI') {
           if (mode === 'FAST') {
-            modelName = 'Gemini 2.0 Flash';
-            costKey = 'GEMINI_FLASH';
-          } else if (mode === 'REGULAR') {
-            modelName = 'Gemini 2.5 Pro';
+            modelName = 'Gemini 3 Flash Preview';
+            costKey = 'GEMINI_3_FLASH';
+          } else if (mode === 'REGULAR') { // Legacy
+            modelName = 'Gemini 2.5 Pro (Legacy)';
             costKey = 'GEMINI_PRO';
           } else { // EXPERT
-            modelName = 'Gemini 3.0 Pro (Exp)';
+            modelName = 'Gemini 3.0 Pro';
             costKey = 'GEMINI_EXPERT';
           }
         } else if (msg.provider === 'OPENAI') {
-          if (mode === 'REGULAR') {
-            modelName = 'GPT-5 Mini';
+          if (mode === 'REGULAR') { // Legacy
+            modelName = 'GPT-5 Mini (Legacy)';
             costKey = 'OPENAI_MINI';
           } else { // EXPERT
-            modelName = 'GPT-5.1';
+            modelName = 'GPT-5.2';
             costKey = 'OPENAI_PRO';
           }
         } else if (msg.provider === 'CLAUDE') {
           if (mode === 'EXPERT') {
             modelName = 'Claude Opus 4.5';
             costKey = 'CLAUDE_OPUS';
-          } else {
-            modelName = 'Claude Sonnet 4.5';
+          } else { // Legacy REGULAR or default
+            modelName = 'Claude Sonnet 4.5 (Legacy)';
             costKey = 'CLAUDE_SONNET';
           }
         }

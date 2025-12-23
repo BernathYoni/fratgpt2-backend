@@ -172,7 +172,7 @@ export class UsageService {
       modeExpertCount: mode === 'EXPERT' ? { increment: 1 } : undefined,
     };
 
-    // Gemini Flash
+    // Gemini Flash (Now Gemini 3 Flash)
     if (tokenUsage.geminiFlash) {
       const cost = CostCalculator.calculateFastModeCost({
         inputTokens: tokenUsage.geminiFlash.input,

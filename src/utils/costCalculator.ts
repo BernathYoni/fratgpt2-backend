@@ -1,22 +1,22 @@
 /**
  * CostCalculator - Calculate API costs from token usage
  *
- * Pricing as of 2025 (per million tokens):
+ * Pricing as of Dec 2025 (per million tokens):
  * FAST Mode:
- * - Gemini 2.0 Flash: $0.10 input, $0.40 output
- *
- * REGULAR Mode:
- * - Gemini 2.5 Pro: $1.25 input, $5.00 output
- * - GPT-5 mini (gpt-5-mini): $0.25 input, $2.00 output
- * - Claude 4.5 Sonnet: $3.00 input, $15.00 output, $3.75 thinking
+ * - Gemini 3 Flash Preview: $0.50 input, $3.00 output
  *
  * EXPERT Mode:
- * - Gemini 3.0 (gemini-exp-1206): $10.00 input, $40.00 output (estimated)
- * - GPT-5.1 (gpt-5.1): $1.25 input, $10.00 output (GPT-5 pricing as proxy)
+ * - Gemini 3.0 Pro: $10.00 input, $40.00 output (estimated)
+ * - GPT-5.2: $1.25 input, $10.00 output (GPT-5 pricing as proxy)
  * - Claude 4.5 Opus: $5.00 input, $25.00 output, $6.25 thinking (estimated)
+ *
+ * LEGACY/REGULAR Mode (Deprecated but kept for history):
+ * - Gemini 2.5 Pro: $1.25 input, $5.00 output
+ * - GPT-5 mini: $0.25 input, $2.00 output
+ * - Claude 4.5 Sonnet: $3.00 input, $15.00 output
  * 
  * ADMIN CHATBOT:
- * - GPT-5.1 (gpt-5.1): $1.25 input, $10.00 output
+ * - GPT-5.2: $1.25 input, $10.00 output
  */
 
 export interface TokenCosts {
@@ -47,45 +47,45 @@ export interface TotalCosts {
 }
 
 export class CostCalculator {
-  // Pricing per million tokens (updated 2025)
+  // Pricing per million tokens (updated Dec 2025)
   private static readonly PRICES = {
     GEMINI_FLASH: {
-      INPUT: 0.10,   // $0.10 per 1M input tokens (Gemini 2.0 Flash)
-      OUTPUT: 0.40,  // $0.40 per 1M output tokens
+      INPUT: 0.10,   // $0.10 (Legacy Gemini 2.0 Flash)
+      OUTPUT: 0.40,  // $0.40
     },
     GEMINI_PRO: {
-      INPUT: 1.25,   // $1.25 per 1M input tokens (Gemini 2.5 Pro)
-      OUTPUT: 5.00,  // $5.00 per 1M output tokens
+      INPUT: 1.25,   // $1.25 (Legacy Gemini 2.5 Pro)
+      OUTPUT: 5.00,  // $5.00
     },
     GEMINI_EXPERT: {
-      INPUT: 10.00,  // $10.00 per 1M input tokens (Gemini 3.0 Pro)
-      OUTPUT: 40.00, // $40.00 per 1M output tokens
+      INPUT: 10.00,  // $10.00 (Gemini 3.0 Pro)
+      OUTPUT: 40.00, // $40.00
     },
     GEMINI_3_FLASH: {
-      INPUT: 0.50,   // $0.50 per 1M input tokens (Gemini 3 Flash Preview - Thinking)
-      OUTPUT: 3.00,  // $3.00 per 1M output tokens
+      INPUT: 0.50,   // $0.50 (Gemini 3 Flash Preview - FAST Mode & Thinking)
+      OUTPUT: 3.00,  // $3.00
     },
     OPENAI_MINI: {
-      INPUT: 0.25,   // $0.25 per 1M input tokens (GPT-5 mini)
-      OUTPUT: 2.00,  // $2.00 per 1M output tokens
+      INPUT: 0.25,   // $0.25 (Legacy GPT-5 mini)
+      OUTPUT: 2.00,  // $2.00
     },
     OPENAI_PRO: {
-      INPUT: 1.25,   // $1.25 per 1M input tokens (GPT-5.1)
-      OUTPUT: 10.00, // $10.00 per 1M output tokens
+      INPUT: 1.25,   // $1.25 (GPT-5.2)
+      OUTPUT: 10.00, // $10.00
     },
     OPENAI_ADMIN: {
-      INPUT: 1.25,   // $1.25 per 1M input tokens (GPT-5.1 for Admin)
-      OUTPUT: 10.00, // $10.00 per 1M output tokens
+      INPUT: 1.25,   // $1.25 (GPT-5.2 for Admin)
+      OUTPUT: 10.00, // $10.00
     },
     CLAUDE_SONNET: {
-      INPUT: 3.00,    // $3.00 per 1M input tokens (Claude 4.5 Sonnet)
-      OUTPUT: 15.00,  // $15.00 per 1M output tokens
-      THINKING: 3.75, // $3.75 per 1M thinking tokens (extended thinking)
+      INPUT: 3.00,    // $3.00 (Legacy Claude 4.5 Sonnet)
+      OUTPUT: 15.00,  // $15.00
+      THINKING: 3.75, // $3.75
     },
     CLAUDE_OPUS: {
-      INPUT: 5.00,    // $5.00 per 1M input tokens (Claude 4.5 Opus)
-      OUTPUT: 25.00,  // $25.00 per 1M output tokens
-      THINKING: 6.25, // $6.25 per 1M thinking tokens (estimated at 1.25x input rate)
+      INPUT: 5.00,    // $5.00 (Claude 4.5 Opus)
+      OUTPUT: 25.00,  // $25.00
+      THINKING: 6.25, // $6.25
     },
   };
 
@@ -97,15 +97,16 @@ export class CostCalculator {
   }
 
   /**
-   * Calculate cost for Fast mode (Gemini Flash)
+   * Calculate cost for Fast mode (Gemini 3 Flash)
    */
   static calculateFastModeCost(tokens: TokenCosts): { totalCost: number } {
-    const cost = this.calculateModelCost('GEMINI_FLASH', tokens);
+    // New FAST mode uses Gemini 3 Flash
+    const cost = this.calculateModelCost('GEMINI_3_FLASH', tokens);
     return { totalCost: cost };
   }
 
   /**
-   * Calculate cost for Regular mode (Gemini Pro)
+   * Calculate cost for Regular mode (Legacy)
    */
   static calculateRegularModeCost(tokens: TokenCosts): { totalCost: number } {
     const cost = this.calculateModelCost('GEMINI_PRO', tokens);
