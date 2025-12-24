@@ -113,7 +113,7 @@ model ChatSession {
   id                  String      @id @default(uuid())
   userId              String
   title               String?
-  mode                ChatMode
+  mode                String      // Changed from ChatMode enum to String for flexibility
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
 
