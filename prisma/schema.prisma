@@ -144,6 +144,7 @@ model Interaction {
 }
 
 enum ChatMode {
+  REGULAR
   FAST
   EXPERT
 }
