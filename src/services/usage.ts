@@ -17,6 +17,18 @@ const PLAN_LIMITS = {
     type: 'cost' as const,
     limit: 16.00, // $16.00 per month (80% of $20)
   },
+  WEEKLY: {
+    type: 'cost' as const,
+    limit: Infinity,
+  },
+  MONTHLY: {
+    type: 'cost' as const,
+    limit: Infinity,
+  },
+  YEARLY: {
+    type: 'cost' as const,
+    limit: Infinity,
+  },
 };
 
 export interface UsageCheckResult {

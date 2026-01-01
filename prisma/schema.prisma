@@ -107,6 +107,9 @@ enum Plan {
   FREE
   BASIC
   PRO
+  WEEKLY
+  MONTHLY
+  YEARLY
 }
 
 model ChatSession {

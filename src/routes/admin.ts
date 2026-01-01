@@ -20,6 +20,9 @@ const PLAN_PRICES: Record<string, number> = {
   FREE: 0,
   BASIC: 5,
   PRO: 20,
+  WEEKLY: 6.99 * 4, // Approx monthly revenue for calculation
+  MONTHLY: 15.99,
+  YEARLY: 59.99 / 12, // Monthly equivalent
 };
 
 export async function adminRoutes(server: FastifyInstance) {
@@ -496,6 +499,9 @@ const resetStatsSchema = z.object({
           FREE: { type: 'solves', limit: 20 },
           BASIC: { type: 'cost', limit: 4.00 },
           PRO: { type: 'cost', limit: 16.00 },
+          WEEKLY: { type: 'cost', limit: Infinity },
+          MONTHLY: { type: 'cost', limit: Infinity },
+          YEARLY: { type: 'cost', limit: Infinity },
         };
         
         const userPlan = plan as keyof typeof limits;

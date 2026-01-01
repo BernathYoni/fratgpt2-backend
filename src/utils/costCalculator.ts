@@ -93,7 +93,7 @@ export class CostCalculator {
    * Check if a plan allows Expert mode
    */
   static allowsExpertMode(plan: string): boolean {
-    return plan === 'PRO';
+    return ['PRO', 'WEEKLY', 'MONTHLY', 'YEARLY'].includes(plan);
   }
 
   /**
