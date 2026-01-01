@@ -91,14 +91,25 @@ export async function billingRoutes(server: FastifyInstance) {
         server.log.info(`[BILLING-CHECKOUT] ✓ Using linked affiliate: ${targetAffiliate.code}`);
       }
 
-      // Apply discount if affiliate has a promo ID
-      if (targetAffiliate && targetAffiliate.stripePromoId) {
+      // Apply Discounts
+      // PRIORITY 1: Weekly Plan Trial ($0.99 first week)
+      if (priceId === process.env.STRIPE_PRICE_WEEKLY && process.env.STRIPE_COUPON_WEEKLY_TRIAL) {
+        server.log.info(`[BILLING-CHECKOUT] 🎁 Applying Weekly Trial Coupon: ${process.env.STRIPE_COUPON_WEEKLY_TRIAL}`);
+        discounts = [{ promotion_code: process.env.STRIPE_COUPON_WEEKLY_TRIAL }];
+        
+        // If there was an affiliate, still track them in metadata
+        if (targetAffiliate) {
+           metadata.affiliateId = targetAffiliate.id;
+        }
+      }
+      // PRIORITY 2: Affiliate Discount
+      else if (targetAffiliate && targetAffiliate.stripePromoId) {
         server.log.info(`[BILLING-CHECKOUT] ✓ Applying affiliate promo: ${targetAffiliate.stripePromoId}`);
         discounts = [{ promotion_code: targetAffiliate.stripePromoId }];
         metadata.affiliateId = targetAffiliate.id;
       } else if (targetAffiliate) {
         server.log.warn(`[BILLING-CHECKOUT] ⚠️ Affiliate ${targetAffiliate.code} has no Stripe Promo ID`);
-        metadata.affiliateId = targetAffiliate.id; // Still track it in metadata even if no discount
+        metadata.affiliateId = targetAffiliate.id; // Still track it
       }
 
       // Create checkout session
