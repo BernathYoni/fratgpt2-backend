@@ -12,9 +12,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
 const PRICE_TO_PLAN: Record<string, 'BASIC' | 'PRO' | 'WEEKLY' | 'MONTHLY' | 'YEARLY'> = {
   [process.env.STRIPE_PRICE_BASIC || 'price_1SQdkDCDxzHnrj8R0nSwZApT']: 'BASIC',
   [process.env.STRIPE_PRICE_PRO || 'price_1SRQyxCDxzHnrj8RmTIm9ye6']: 'PRO',
-  [process.env.STRIPE_PRICE_WEEKLY || 'price_weekly_placeholder']: 'WEEKLY',
-  [process.env.STRIPE_PRICE_MONTHLY || 'price_monthly_placeholder']: 'MONTHLY',
-  [process.env.STRIPE_PRICE_YEARLY || 'price_yearly_placeholder']: 'YEARLY',
+  [process.env.STRIPE_PRICE_WEEKLY || 'price_1SkuZ4CDxzHnrj8RZBkuzBjJ']: 'WEEKLY',
+  [process.env.STRIPE_PRICE_MONTHLY || 'price_1SkuG2CDxzHnrj8R6xewCZni']: 'MONTHLY',
+  [process.env.STRIPE_PRICE_YEARLY || 'price_1SkuFHCDxzHnrj8Ri40vhqr3']: 'YEARLY',
 };
 
 const checkoutSchema = z.object({
