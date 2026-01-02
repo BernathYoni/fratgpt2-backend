@@ -142,7 +142,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session, server:
       const currentPlan = user.subscriptions[0]?.plan || 'FREE';
       server.log.info(`[WEBHOOK-CHECKOUT] 📊 Current DB Plan: ${currentPlan}`);
 
-      if (currentPlan === 'BASIC' || currentPlan === 'PRO') {
+      if (currentPlan === 'BASIC' || currentPlan === 'PRO' || currentPlan === 'WEEKLY' || currentPlan === 'MONTHLY' || currentPlan === 'YEARLY') {
         server.log.info(`[WEBHOOK-CHECKOUT] 🚀 CATCH-UP INCREMENT NEEDED!`);
         server.log.info(`[WEBHOOK-CHECKOUT] Reason: Plan is already ${currentPlan} (Subscription webhook ran first), but user wasn't linked then.`);
         
@@ -191,7 +191,8 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription, serve
   server.log.info(`[WEBHOOK-SUB-CHANGE] ✓ User found: ${user.email} (${user.id})`);
 
   const priceId = subscription.items.data[0]?.price.id;
-  let plan: string = PRICE_TO_PLAN[priceId] || 'FREE';
+  // Use 'any' cast to allow dynamic mapping to new plan types
+  let plan: any = PRICE_TO_PLAN[priceId] || 'FREE';
   const status = mapStripeStatus(subscription.status);
 
   // Affiliate Tracking Logic
@@ -201,7 +202,10 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription, serve
   if (user.affiliateId) {
     server.log.info(`[WEBHOOK-SUB-CHANGE] 🔗 User is linked to affiliate: ${user.affiliateId}`);
     
-    if ((plan === 'BASIC' || plan === 'PRO') && currentDbPlan === 'FREE') {
+    // Check if new plan is a paid plan
+    const isPaidPlan = ['BASIC', 'PRO', 'WEEKLY', 'MONTHLY', 'YEARLY'].includes(plan);
+    
+    if (isPaidPlan && currentDbPlan === 'FREE') {
       server.log.info(`[WEBHOOK-SUB-CHANGE] 🚀 UPGRADE DETECTED! (FREE -> ${plan})`);
       server.log.info(`[WEBHOOK-SUB-CHANGE] Incrementing stats for affiliate ${user.affiliateId}...`);
       
@@ -219,14 +223,52 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription, serve
     }
   } else {
     server.log.info(`[WEBHOOK-SUB-CHANGE] ℹ️ User is NOT linked to any affiliate. Skipping attribution.`);
-    if ((plan === 'BASIC' || plan === 'PRO') && currentDbPlan === 'FREE') {
+    const isPaidPlan = ['BASIC', 'PRO', 'WEEKLY', 'MONTHLY', 'YEARLY'].includes(plan);
+    if (isPaidPlan && currentDbPlan === 'FREE') {
       server.log.warn(`[WEBHOOK-SUB-CHANGE] ⚠️ Note: This was an upgrade, but no affiliate was linked. If this was a referral, handleCheckoutCompleted should catch it.`);
     }
   }
 
   server.log.info(`[WEBHOOK-SUB-CHANGE] Price ID from Stripe: ${priceId}`);
   server.log.info(`[WEBHOOK-SUB-CHANGE] Mapped plan (initial): ${plan}`);
-  // ... rest of the function ...
+
+  // Create or update subscription in DB
+  // Check if subscription already exists
+  const existingSub = await prisma.subscription.findUnique({
+    where: { stripeSubscriptionId: subscription.id }
+  });
+
+  if (existingSub) {
+    server.log.info(`[WEBHOOK-SUB-CHANGE] Updating existing subscription: ${existingSub.id}`);
+    await prisma.subscription.update({
+      where: { id: existingSub.id },
+      data: {
+        status,
+        plan,
+        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+        stripePriceId: priceId,
+      }
+    });
+  } else {
+    server.log.info(`[WEBHOOK-SUB-CHANGE] Creating NEW subscription record`);
+    
+    // Deactivate any old subscriptions just in case
+    await prisma.subscription.updateMany({
+      where: { userId: user.id, status: 'ACTIVE' },
+      data: { status: 'CANCELED' }
+    });
+    
+    await prisma.subscription.create({
+      data: {
+        userId: user.id,
+        stripeSubscriptionId: subscription.id,
+        stripePriceId: priceId,
+        status,
+        plan,
+        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+      }
+    });
+  }
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription, server: FastifyInstance) {
