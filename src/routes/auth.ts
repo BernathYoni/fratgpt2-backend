@@ -138,9 +138,7 @@ export async function authRoutes(server: FastifyInstance) {
           role: true,
           createdAt: true,
           subscriptions: {
-            where: { 
-              status: { in: ['ACTIVE', 'TRIALING'] } 
-            },
+            where: { status: 'ACTIVE' },
             orderBy: { createdAt: 'desc' },
             take: 1,
             select: {
